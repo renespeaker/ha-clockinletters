@@ -5,7 +5,7 @@
  * plus vier Eck-Punkte für die Minuten zwischen den 5-Minuten-Schritten.
  */
 
-const CARD_VERSION = "1.0.0";
+const CARD_VERSION = "1.1.0";
 
 const GRID = [
   "ESKISTAFÜNF",
@@ -52,18 +52,98 @@ const HOURS = [
 const HOUR_EIN = [5, 0, 3]; // "EIN UHR"
 
 const DEFAULTS = {
-  color_on: "#ffffff",
-  color_off: "rgba(255, 255, 255, 0.12)",
-  background: "#111111",
+  // Farben: [r, g, b] (Farbwähler im Editor) oder beliebiger CSS-Farbwert
+  color_on: [255, 255, 255],
+  color_off: [255, 255, 255],
+  off_opacity: 15, // Deckkraft der inaktiven Buchstaben in %
+  background: [17, 17, 17],
   glow: true,
+  glow_strength: 35, // Stärke des Leucht-Effekts in %
   show_dots: true,
   show_es_ist: true,
   dialect: "west", // west: VIERTEL NACH / VIERTEL VOR – ost: VIERTEL / DREIVIERTEL
   zwanzig: "zwanzig", // zwanzig: ZWANZIG NACH – halb: ZEHN VOR HALB
-  font_family: "'Helvetica Neue', Arial, sans-serif",
+  font_family: "Helvetica Neue",
+  font_size: 100, // in % der Standardgröße
+  font_weight: "300",
   rounded: true,
-  padding: "8%",
+  padding: 8, // Innenabstand in %
 };
+
+// Auswahl im Editor: Name -> CSS font-family
+const FONT_STACKS = {
+  "Helvetica Neue": "'Helvetica Neue', Helvetica, Arial, sans-serif",
+  Roboto: "Roboto, 'Helvetica Neue', Arial, sans-serif",
+  Arial: "Arial, sans-serif",
+  Verdana: "Verdana, Geneva, sans-serif",
+  "Trebuchet MS": "'Trebuchet MS', sans-serif",
+  Georgia: "Georgia, 'Times New Roman', serif",
+  "Times New Roman": "'Times New Roman', Times, serif",
+  "Courier New": "'Courier New', Courier, monospace",
+};
+
+// Werden bei Bedarf von Google Fonts nachgeladen (Internetzugang nötig)
+const GOOGLE_FONTS = [
+  "Josefin Sans",
+  "Montserrat",
+  "Raleway",
+  "Poppins",
+  "Oswald",
+  "Quicksand",
+  "Comfortaa",
+  "Orbitron",
+  "Playfair Display",
+  "Roboto Mono",
+];
+
+function resolveFont(name) {
+  if (!name) return FONT_STACKS[DEFAULTS.font_family];
+  if (FONT_STACKS[name]) return FONT_STACKS[name];
+  if (GOOGLE_FONTS.includes(name)) {
+    loadGoogleFont(name);
+    return `'${name}', sans-serif`;
+  }
+  return name; // freie Eingabe, z. B. "'Meine Schrift', serif"
+}
+
+function loadGoogleFont(name) {
+  const id = `clockinletters-font-${name.replace(/\s+/g, "-").toLowerCase()}`;
+  if (document.getElementById(id)) return;
+  const link = document.createElement("link");
+  link.id = id;
+  link.rel = "stylesheet";
+  link.href = `https://fonts.googleapis.com/css2?family=${encodeURIComponent(
+    name
+  )}:wght@100;200;300;400;500;600;700;800;900&display=swap`;
+  document.head.appendChild(link);
+}
+
+/** [r, g, b] oder CSS-String -> CSS-Farbe */
+function toCss(value, fallback) {
+  if (Array.isArray(value) && value.length >= 3) return `rgb(${value.slice(0, 3).join(", ")})`;
+  if (typeof value === "string" && value.trim()) return value;
+  return toCss(fallback);
+}
+
+/** CSS-Farbe (#rgb, #rrggbb, rgb()) -> [r, g, b], sonst unverändert */
+function toRgb(value) {
+  if (typeof value !== "string") return value;
+  const v = value.trim();
+  let m = v.match(/^#([0-9a-f]{3}|[0-9a-f]{6})$/i);
+  if (m) {
+    let h = m[1];
+    if (h.length === 3) h = [...h].map((x) => x + x).join("");
+    return [0, 2, 4].map((i) => parseInt(h.substr(i, 2), 16));
+  }
+  m = v.match(/^rgba?\(\s*(\d+)[\s,]+(\d+)[\s,]+(\d+)/i);
+  if (m) return [+m[1], +m[2], +m[3]];
+  return value;
+}
+
+function clamp(n, min, max, fallback) {
+  const x = Number(n);
+  return Number.isFinite(x) ? Math.min(max, Math.max(min, x)) : fallback;
+}
 
 /** Liefert die zu leuchtenden Wörter und die Anzahl der Eck-Punkte. */
 function computeWords(date, cfg) {
@@ -202,6 +282,14 @@ class ClockInLettersCard extends HTMLElement {
     if (!this._config) return;
     if (!this.shadowRoot) this.attachShadow({ mode: "open" });
     const c = this._config;
+    const on = toCss(c.color_on, DEFAULTS.color_on);
+    const offBase = toCss(c.color_off, DEFAULTS.color_off);
+    const offOpacity = clamp(c.off_opacity, 0, 100, DEFAULTS.off_opacity);
+    const off = `color-mix(in srgb, ${offBase} ${offOpacity}%, transparent)`;
+    const bg = toCss(c.background, DEFAULTS.background);
+    const fontSize = (6 * clamp(c.font_size, 30, 150, 100)) / 100;
+    const glow = c.glow ? clamp(c.glow_strength, 0, 100, DEFAULTS.glow_strength) / 100 : 0;
+    const padding = typeof c.padding === "string" ? c.padding : `${clamp(c.padding, 0, 25, 8)}%`;
 
     const letters = GRID.map(
       (row, r) =>
@@ -218,9 +306,9 @@ class ClockInLettersCard extends HTMLElement {
       <style>
         :host {
           display: block;
-          --ct-on: ${c.color_on};
-          --ct-off: ${c.color_off};
-          --ct-bg: ${c.background};
+          --ct-on: ${on};
+          --ct-off: ${off};
+          --ct-bg: ${bg};
         }
         ha-card {
           display: block;
@@ -237,13 +325,13 @@ class ClockInLettersCard extends HTMLElement {
         }
         .grid {
           position: absolute;
-          inset: ${c.padding};
+          inset: ${padding};
           display: flex;
           flex-direction: column;
           justify-content: space-between;
-          font-family: ${c.font_family};
-          font-weight: 300;
-          font-size: 6cqi;
+          font-family: ${resolveFont(c.font_family)};
+          font-weight: ${c.font_weight || DEFAULTS.font_weight};
+          font-size: ${fontSize}cqi;
           line-height: 1;
           user-select: none;
         }
@@ -252,14 +340,14 @@ class ClockInLettersCard extends HTMLElement {
           justify-content: space-between;
         }
         .l {
-          width: 1em;
+          flex: 1 1 0;
           text-align: center;
           color: var(--ct-off);
           transition: color 0.8s ease, text-shadow 0.8s ease;
         }
         .l.on {
           color: var(--ct-on);
-          ${c.glow ? "text-shadow: 0 0 0.35em var(--ct-on);" : ""}
+          ${glow ? `text-shadow: 0 0 ${glow}em var(--ct-on);` : ""}
         }
         .dot {
           position: absolute;
@@ -271,7 +359,7 @@ class ClockInLettersCard extends HTMLElement {
         }
         .dot.on {
           background: var(--ct-on);
-          ${c.glow ? "box-shadow: 0 0 1.5cqi var(--ct-on);" : ""}
+          ${glow ? `box-shadow: 0 0 ${glow * 4}cqi var(--ct-on);` : ""}
         }
         .d1 { top: 3.3cqi; left: 3.3cqi; }
         .d2 { top: 3.3cqi; right: 3.3cqi; }
@@ -319,7 +407,7 @@ class ClockInLettersCardEditor extends HTMLElement {
   _render() {
     if (!this._form) {
       this._form = document.createElement("ha-form");
-      this._form.computeLabel = (s) => LABELS[s.name] || s.name;
+      this._form.computeLabel = (s) => s.title || LABELS[s.name] || s.name;
       this._form.addEventListener("value-changed", (ev) => {
         this.dispatchEvent(
           new CustomEvent("config-changed", {
@@ -333,68 +421,143 @@ class ClockInLettersCardEditor extends HTMLElement {
     }
     this._form.hass = this._hass;
     this._form.schema = SCHEMA;
-    this._form.data = { ...DEFAULTS, ...this._config };
+    const data = { ...DEFAULTS, ...this._config };
+    for (const key of ["color_on", "color_off", "background"]) data[key] = toRgb(data[key]);
+    if (typeof data.padding === "string") data.padding = parseFloat(data.padding) || DEFAULTS.padding;
+    this._form.data = data;
   }
 }
 
 const LABELS = {
-  color_on: "Farbe aktiv (CSS)",
-  color_off: "Farbe inaktiv (CSS)",
-  background: "Hintergrund (CSS)",
+  font_family: "Schriftart",
+  font_size: "Schriftgröße (%)",
+  font_weight: "Schriftstärke",
+  color_on: "Farbe aktive Buchstaben",
+  color_off: "Farbe inaktive Buchstaben",
+  off_opacity: "Deckkraft inaktive Buchstaben (%)",
+  background: "Hintergrundfarbe",
   glow: "Leucht-Effekt",
+  glow_strength: "Stärke Leucht-Effekt (%)",
   show_dots: "Minuten-Punkte in den Ecken",
   show_es_ist: "„ES IST“ anzeigen",
+  rounded: "Abgerundete Ecken",
+  padding: "Innenabstand (%)",
   dialect: "Viertel-Schreibweise",
   zwanzig: "20 / 40 Minuten",
-  font_family: "Schriftart",
-  rounded: "Abgerundete Ecken",
-  padding: "Innenabstand (z. B. 8%)",
 };
+
+const slider = (min, max, step = 1) => ({
+  number: { min, max, step, mode: "slider", unit_of_measurement: "%" },
+});
 
 const SCHEMA = [
   {
-    type: "grid",
-    name: "",
+    type: "expandable",
+    name: "schrift",
+    flatten: true,
+    title: "Schrift",
+    icon: "mdi:format-font",
+    expanded: true,
     schema: [
-      { name: "color_on", selector: { text: {} } },
-      { name: "color_off", selector: { text: {} } },
-      { name: "background", selector: { text: {} } },
-      { name: "padding", selector: { text: {} } },
+      {
+        name: "font_family",
+        selector: {
+          select: {
+            mode: "dropdown",
+            custom_value: true,
+            options: [
+              ...Object.keys(FONT_STACKS).map((f) => ({ value: f, label: f })),
+              ...GOOGLE_FONTS.map((f) => ({ value: f, label: `${f} (Google Fonts)` })),
+            ],
+          },
+        },
+      },
+      { name: "font_size", selector: slider(50, 130) },
+      {
+        name: "font_weight",
+        selector: {
+          select: {
+            mode: "dropdown",
+            options: [
+              { value: "100", label: "Hauchdünn (100)" },
+              { value: "200", label: "Extra leicht (200)" },
+              { value: "300", label: "Leicht (300)" },
+              { value: "400", label: "Normal (400)" },
+              { value: "500", label: "Mittel (500)" },
+              { value: "600", label: "Halbfett (600)" },
+              { value: "700", label: "Fett (700)" },
+              { value: "900", label: "Extra fett (900)" },
+            ],
+          },
+        },
+      },
     ],
   },
   {
-    name: "dialect",
-    selector: {
-      select: {
-        mode: "dropdown",
-        options: [
-          { value: "west", label: "Viertel nach / Viertel vor" },
-          { value: "ost", label: "Viertel / Dreiviertel" },
-        ],
-      },
-    },
-  },
-  {
-    name: "zwanzig",
-    selector: {
-      select: {
-        mode: "dropdown",
-        options: [
-          { value: "zwanzig", label: "Zwanzig nach / Zwanzig vor" },
-          { value: "halb", label: "Zehn vor halb / Zehn nach halb" },
-        ],
-      },
-    },
-  },
-  { name: "font_family", selector: { text: {} } },
-  {
-    type: "grid",
-    name: "",
+    type: "expandable",
+    name: "farben",
+    flatten: true,
+    title: "Farben",
+    icon: "mdi:palette",
     schema: [
+      { name: "color_on", selector: { color_rgb: {} } },
+      { name: "color_off", selector: { color_rgb: {} } },
+      { name: "off_opacity", selector: slider(0, 100) },
+      { name: "background", selector: { color_rgb: {} } },
       { name: "glow", selector: { boolean: {} } },
-      { name: "show_dots", selector: { boolean: {} } },
-      { name: "show_es_ist", selector: { boolean: {} } },
-      { name: "rounded", selector: { boolean: {} } },
+      { name: "glow_strength", selector: slider(0, 100) },
+    ],
+  },
+  {
+    type: "expandable",
+    name: "anzeige",
+    flatten: true,
+    title: "Anzeige",
+    icon: "mdi:cog",
+    schema: [
+      {
+        type: "grid",
+        name: "",
+        schema: [
+          { name: "show_dots", selector: { boolean: {} } },
+          { name: "show_es_ist", selector: { boolean: {} } },
+          { name: "rounded", selector: { boolean: {} } },
+        ],
+      },
+      { name: "padding", selector: slider(0, 20) },
+    ],
+  },
+  {
+    type: "expandable",
+    name: "sprache",
+    flatten: true,
+    title: "Sprechweise",
+    icon: "mdi:message-text-clock",
+    schema: [
+      {
+        name: "dialect",
+        selector: {
+          select: {
+            mode: "dropdown",
+            options: [
+              { value: "west", label: "Viertel nach / Viertel vor" },
+              { value: "ost", label: "Viertel / Dreiviertel" },
+            ],
+          },
+        },
+      },
+      {
+        name: "zwanzig",
+        selector: {
+          select: {
+            mode: "dropdown",
+            options: [
+              { value: "zwanzig", label: "Zwanzig nach / Zwanzig vor" },
+              { value: "halb", label: "Zehn vor halb / Zehn nach halb" },
+            ],
+          },
+        },
+      },
     ],
   },
 ];
@@ -420,4 +583,4 @@ console.info(
   "color: #fff; background: #111;"
 );
 
-if (typeof module !== "undefined") module.exports = { computeWords, wordsToText };
+if (typeof module !== "undefined") module.exports = { computeWords, wordsToText, toCss, toRgb, resolveFont };

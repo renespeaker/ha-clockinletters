@@ -6,17 +6,23 @@
 <title>Clock in Letters</title>
 <style>
   body { margin: 0; background: #2b2b2b; display: flex; gap: 24px; flex-wrap: wrap; justify-content: center; padding: 24px; }
-  clockinletters-card { width: 360px; max-width: 100%; }
+  clockinletters-card { width: 300px; max-width: 100%; }
 </style>
 </head>
 <body>
   <clockinletters-card id="a"></clockinletters-card>
   <clockinletters-card id="b"></clockinletters-card>
+  <clockinletters-card id="c"></clockinletters-card>
   <script src="clockinletters-card.js"></script>
   <script>
     document.getElementById("a").setConfig({});
     document.getElementById("b").setConfig({
-      background: "#c9a227", color_on: "#1a1a1a", color_off: "rgba(0,0,0,0.15)", glow: false
+      background: "#c9a227", color_on: "#1a1a1a", color_off: "#000000", off_opacity: 15, glow: false,
+      font_family: "Georgia", font_weight: "400"
+    });
+    document.getElementById("c").setConfig({
+      background: [10, 25, 45], color_on: [120, 200, 255], off_opacity: 10,
+      font_family: "Josefin Sans", font_size: 120, font_weight: "600", glow_strength: 60
     });
   </script>
 </body>
