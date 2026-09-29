@@ -7,7 +7,8 @@
 <style>
   body { margin: 0; background: #2b2b2b; display: flex; gap: 24px; flex-wrap: wrap; justify-content: center; padding: 24px; }
   clockinletters-card { width: 300px; max-width: 100%; }
-  #c { background: #d9d4cc; border-radius: 12px; }
+  #a { background: #efece6; border-radius: 12px; }
+  #c { background: #2a2a2a; border-radius: 12px; }
 </style>
 </head>
 <body>
@@ -16,9 +17,9 @@
   <clockinletters-card id="c"></clockinletters-card>
   <script src="clockinletters-card.js"></script>
   <script>
-    document.getElementById("a").setConfig({});
+    document.getElementById("a").setConfig({ theme: "oliv", language: "en", wall_mount: true });
     document.getElementById("b").setConfig({ theme: "walnuss" });
-    document.getElementById("c").setConfig({ theme: "kupfer", wall_mount: true });
+    document.getElementById("c").setConfig({ theme: "kupfer", view_3d: true });
   </script>
 </body>
 </html>

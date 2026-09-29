@@ -5,7 +5,7 @@
  * plus vier Eck-Punkte für die Minuten zwischen den 5-Minuten-Schritten.
  */
 
-const CARD_VERSION = "1.3.0";
+const CARD_VERSION = "1.4.0";
 
 const GRID = [
   "ESKISTAFÜNF",
@@ -64,14 +64,17 @@ const DEFAULTS = {
   show_es_ist: true,
   dialect: "west", // west: VIERTEL NACH / VIERTEL VOR – ost: VIERTEL / DREIVIERTEL
   zwanzig: "zwanzig", // zwanzig: ZWANZIG NACH – halb: ZEHN VOR HALB
-  font_family: "Helvetica Neue",
-  font_size: 100, // in % der Standardgröße
-  font_weight: "300",
+  language: "de", // de oder en
+  font_family: "Barlow",
+  font_size: 85, // in % der Standardgröße
+  font_weight: "400",
   rounded: true,
-  padding: 8, // Innenabstand in %
+  padding: 16, // Innenabstand in %
   realistic: true, // Oberfläche, Lichtreflex und LED-Leuchten wie bei einer echten Wortuhr
   finish: "auto", // Oberfläche: auto (passend zur Vorlage), glanz, gebuerstet, matt, holz, rost, flach
   wall_mount: false, // Uhr schwebt mit Schatten auf der Karte wie an der Wand
+  view_3d: false, // schräge Ansicht mit sichtbarer Plattenkante
+  stencil: true, // Stege in O, Ö, Q, D wie bei ausgefrästen Buchstaben
 };
 
 // Farb-Vorlagen: setzen Farben, Deckkraft und Leucht-Effekt.
@@ -87,10 +90,20 @@ const THEMES = {
     label: "⚪ Weiß",
     values: { background: [242, 241, 237], color_on: [25, 25, 25], color_off: [0, 0, 0], off_opacity: 10, glow: false, glow_strength: 35 },
   },
+  oliv: {
+    finish: "matt",
+    label: "🫒 Oliv",
+    values: { background: [76, 75, 45], color_on: [255, 255, 255], color_off: [232, 230, 218], off_opacity: 45, glow: true, glow_strength: 18 },
+  },
+  anthrazit: {
+    finish: "matt",
+    label: "⬛ Anthrazit",
+    values: { background: [52, 54, 56], color_on: [255, 255, 255], color_off: [230, 230, 230], off_opacity: 38, glow: true, glow_strength: 18 },
+  },
   messing: {
     finish: "gebuerstet",
     label: "🟡 Messing",
-    values: { background: [168, 134, 58], color_on: [22, 20, 16], color_off: [0, 0, 0], off_opacity: 15, glow: false, glow_strength: 35 },
+    values: { background: [158, 126, 60], color_on: [255, 255, 255], color_off: [250, 246, 235], off_opacity: 60, glow: true, glow_strength: 25 },
   },
   gold: {
     finish: "glanz",
@@ -100,22 +113,22 @@ const THEMES = {
   kupfer: {
     finish: "gebuerstet",
     label: "🟠 Kupfer",
-    values: { background: [150, 82, 48], color_on: [255, 240, 222], color_off: [0, 0, 0], off_opacity: 18, glow: true, glow_strength: 25 },
+    values: { background: [140, 76, 44], color_on: [255, 255, 255], color_off: [250, 240, 230], off_opacity: 50, glow: true, glow_strength: 25 },
   },
   edelstahl: {
     finish: "gebuerstet",
     label: "🔘 Edelstahl",
-    values: { background: [170, 174, 178], color_on: [18, 18, 18], color_off: [0, 0, 0], off_opacity: 12, glow: false, glow_strength: 35 },
+    values: { background: [150, 154, 158], color_on: [255, 255, 255], color_off: [250, 250, 250], off_opacity: 60, glow: true, glow_strength: 25 },
   },
   walnuss: {
     finish: "holz",
     label: "🟤 Walnuss",
-    values: { background: [86, 58, 38], color_on: [255, 214, 150], color_off: [0, 0, 0], off_opacity: 25, glow: true, glow_strength: 35 },
+    values: { background: [86, 58, 38], color_on: [255, 236, 200], color_off: [245, 235, 220], off_opacity: 45, glow: true, glow_strength: 30 },
   },
   rot: {
     finish: "glanz",
     label: "🔴 Rot",
-    values: { background: [165, 22, 32], color_on: [255, 255, 255], color_off: [0, 0, 0], off_opacity: 20, glow: true, glow_strength: 30 },
+    values: { background: [150, 24, 32], color_on: [255, 255, 255], color_off: [250, 230, 230], off_opacity: 35, glow: true, glow_strength: 25 },
   },
   nachtblau: {
     finish: "matt",
@@ -130,12 +143,12 @@ const THEMES = {
   rost: {
     finish: "rost",
     label: "🧱 Rost",
-    values: { background: [122, 62, 30], color_on: [255, 236, 212], color_off: [20, 8, 0], off_opacity: 30, glow: true, glow_strength: 35 },
+    values: { background: [122, 62, 30], color_on: [255, 244, 230], color_off: [245, 232, 220], off_opacity: 50, glow: true, glow_strength: 30 },
   },
   pink: {
     finish: "glanz",
     label: "🩷 Pink",
-    values: { background: [225, 85, 145], color_on: [255, 255, 255], color_off: [0, 0, 0], off_opacity: 15, glow: true, glow_strength: 30 },
+    values: { background: [214, 84, 140], color_on: [255, 255, 255], color_off: [255, 240, 246], off_opacity: 40, glow: true, glow_strength: 25 },
   },
   ha: {
     finish: "matt",
@@ -163,7 +176,8 @@ function noise(baseFrequency, octaves, alpha, size = 400) {
 const FINISHES = {
   flach: "",
   glanz: "",
-  matt: `background-image: ${noise("0.8", 2, 0.35, 200)}; background-blend-mode: soft-light;`,
+  matt: `background-image: ${noise("1.2", 2, 0.55, 200)}, ${noise("0.01", 3, 0.35, 500)};
+    background-blend-mode: soft-light, soft-light;`,
   gebuerstet: `
     background-image: linear-gradient(100deg, rgba(255,255,255,0.18), rgba(0,0,0,0.12) 35%, rgba(255,255,255,0.14) 60%, rgba(0,0,0,0.18)),
       ${noise("0.0015 0.9", 3, 0.6)};
@@ -182,7 +196,7 @@ const SHEENS = {
   glanz:
     "linear-gradient(125deg, rgba(255,255,255,0.13) 0%, rgba(255,255,255,0.05) 38%, rgba(255,255,255,0) 38.5%, rgba(255,255,255,0) 100%)",
   gebuerstet: "linear-gradient(160deg, rgba(255,255,255,0.12), rgba(255,255,255,0) 45%, rgba(0,0,0,0.12))",
-  matt: "radial-gradient(circle at 30% 20%, rgba(255,255,255,0.06), rgba(0,0,0,0.12) 90%)",
+  matt: "radial-gradient(ellipse at 85% 12%, rgba(255,255,255,0.14), rgba(255,255,255,0) 55%), radial-gradient(circle at 20% 90%, rgba(0,0,0,0.15), rgba(0,0,0,0) 60%)",
   holz: "linear-gradient(160deg, rgba(255,255,255,0.07), rgba(0,0,0,0.15))",
   rost: "radial-gradient(circle at 30% 20%, rgba(255,255,255,0.05), rgba(0,0,0,0.25) 95%)",
 };
@@ -192,6 +206,9 @@ function resolveFinish(config) {
   const theme = THEMES[config.theme];
   return (theme && theme.finish) || "glanz";
 }
+
+// Buchstaben mit geschlossenem Innenraum bekommen Stege
+const STENCIL_CHARS = ["O", "Ö", "Q", "D"];
 
 const THEME_KEYS = ["background", "color_on", "color_off", "off_opacity", "glow", "glow_strength"];
 
@@ -215,6 +232,7 @@ const FONT_STACKS = {
 
 // Werden bei Bedarf von Google Fonts nachgeladen (Internetzugang nötig)
 const GOOGLE_FONTS = [
+  "Barlow",
   "Josefin Sans",
   "Montserrat",
   "Raleway",
@@ -232,7 +250,7 @@ function resolveFont(name) {
   if (FONT_STACKS[name]) return FONT_STACKS[name];
   if (GOOGLE_FONTS.includes(name)) {
     loadGoogleFont(name);
-    return `'${name}', sans-serif`;
+    return `'${name}', ${FONT_STACKS["Helvetica Neue"]}`;
   }
   return name; // freie Eingabe, z. B. "'Meine Schrift', serif"
 }
@@ -276,8 +294,91 @@ function clamp(n, min, max, fallback) {
   return Number.isFinite(x) ? Math.min(max, Math.max(min, x)) : fallback;
 }
 
+const GRID_EN = [
+  "ITLISASAMPM",
+  "ACQUARTERDC",
+  "TWENTYFIVEX",
+  "HALFSTENFTO",
+  "PASTERUNINE",
+  "ONESIXTHREE",
+  "FOURFIVETWO",
+  "EIGHTELEVEN",
+  "SEVENTWELVE",
+  "TENSEOCLOCK",
+];
+
+const WORDS_EN = {
+  IT: [0, 0, 2],
+  IS: [0, 3, 2],
+  A: [1, 0, 1],
+  QUARTER: [1, 2, 7],
+  TWENTY: [2, 0, 6],
+  M_FIVE: [2, 6, 4],
+  HALF: [3, 0, 4],
+  M_TEN: [3, 5, 3],
+  TO: [3, 9, 2],
+  PAST: [4, 0, 4],
+  OCLOCK: [9, 5, 6],
+};
+
+const HOURS_EN = [
+  [8, 5, 6], // 0/12 TWELVE
+  [5, 0, 3], // 1 ONE
+  [6, 8, 3], // 2 TWO
+  [5, 6, 5], // 3 THREE
+  [6, 0, 4], // 4 FOUR
+  [6, 4, 4], // 5 FIVE
+  [5, 3, 3], // 6 SIX
+  [8, 0, 5], // 7 SEVEN
+  [7, 0, 5], // 8 EIGHT
+  [4, 7, 4], // 9 NINE
+  [9, 0, 3], // 10 TEN
+  [7, 5, 6], // 11 ELEVEN
+];
+
+function computeWordsEn(date, cfg) {
+  const minute = date.getMinutes();
+  const step = Math.floor(minute / 5);
+  let hour = date.getHours() % 12;
+  const w = WORDS_EN;
+  const words = [];
+  if (cfg.show_es_ist) words.push(w.IT, w.IS);
+  const minuteWords = [
+    [],
+    [w.M_FIVE, w.PAST],
+    [w.M_TEN, w.PAST],
+    [w.A, w.QUARTER, w.PAST],
+    [w.TWENTY, w.PAST],
+    [w.TWENTY, w.M_FIVE, w.PAST],
+    [w.HALF, w.PAST],
+    [w.TWENTY, w.M_FIVE, w.TO],
+    [w.TWENTY, w.TO],
+    [w.A, w.QUARTER, w.TO],
+    [w.M_TEN, w.TO],
+    [w.M_FIVE, w.TO],
+  ][step];
+  words.push(...minuteWords);
+  if (step > 6) hour = (hour + 1) % 12;
+  words.push(HOURS_EN[hour]);
+  if (step === 0) words.push(w.OCLOCK);
+  return { words, dots: minute % 5 };
+}
+
+const LAYOUTS = {
+  de: { grid: GRID, compute: computeWordsDe },
+  en: { grid: GRID_EN, compute: computeWordsEn },
+};
+
+function layoutOf(cfg) {
+  return LAYOUTS[cfg && cfg.language] || LAYOUTS.de;
+}
+
 /** Liefert die zu leuchtenden Wörter und die Anzahl der Eck-Punkte. */
 function computeWords(date, cfg) {
+  return layoutOf(cfg).compute(date, cfg);
+}
+
+function computeWordsDe(date, cfg) {
   const minute = date.getMinutes();
   const step = Math.floor(minute / 5);
   let hour = date.getHours() % 12;
@@ -358,8 +459,8 @@ function computeWords(date, cfg) {
 }
 
 /** Menschlich lesbarer Text, z. B. für Screenreader. */
-function wordsToText(words) {
-  return words.map(([r, c, l]) => GRID[r].substr(c, l)).join(" ");
+function wordsToText(words, grid = GRID) {
+  return words.map(([r, c, l]) => grid[r].substr(c, l)).join(" ");
 }
 
 class ClockInLettersCard extends HTMLElement {
@@ -424,13 +525,23 @@ class ClockInLettersCard extends HTMLElement {
     const realistic = c.realistic !== false;
     const finish = realistic ? resolveFinish(c) : "flach";
     const wall = realistic && c.wall_mount;
+    const view3d = realistic && c.view_3d;
+    const stencil = realistic && c.stencil !== false;
+    const layout = layoutOf(c);
 
-    const letters = GRID.map(
-      (row, r) =>
-        `<div class="row">${[...row]
-          .map((ch, i) => `<span class="l" data-r="${r}" data-c="${i}">${ch}</span>`)
-          .join("")}</div>`
-    ).join("");
+    const letters = layout.grid
+      .map(
+        (row, r) =>
+          `<div class="row">${[...row]
+            .map((ch, i) => {
+              // O'CLOCK: Apostroph über dem O wie auf der echten Frontplatte
+              const shown = layout === LAYOUTS.en && r === 9 && i === 5 ? "Ó" : ch;
+              const inner = stencil && STENCIL_CHARS.includes(ch) ? `<i class="st">${shown}</i>` : shown;
+              return `<span class="l">${inner}</span>`;
+            })
+            .join("")}</div>`
+      )
+      .join("");
 
     const dots = c.show_dots
       ? [1, 2, 3, 4].map((n) => `<span class="dot d${n}"></span>`).join("")
@@ -455,11 +566,12 @@ class ClockInLettersCard extends HTMLElement {
         ha-card {
           display: block;
           overflow: hidden;
-          ${wall ? "" : "background: var(--ct-bg);"}
+          ${wall || view3d ? "" : "background: var(--ct-bg);"}
           ${c.rounded ? "" : "border-radius: 0;"}
         }
         .wrap {
-          padding: ${wall ? "8%" : "0"};
+          padding: ${wall || view3d ? "8%" : "0"};
+          ${view3d ? "perspective: 1400px;" : ""}
         }
         .face {
           position: relative;
@@ -470,10 +582,18 @@ class ClockInLettersCard extends HTMLElement {
           background-color: var(--ct-bg);
           ${FINISHES[finish] || ""}
           ${
-            wall
-              ? `border-radius: 0.4cqi;
+            view3d
+              ? `transform: rotateY(-16deg) rotateX(3deg) scale(0.94);
+                 transform-origin: 60% 50%;
+                 border-radius: 0.3cqi;
+                 box-shadow: -0.4cqi 0 0 color-mix(in srgb, var(--ct-bg) 45%, black),
+                   -0.8cqi 0.1cqi 0 color-mix(in srgb, var(--ct-bg) 35%, black),
+                   -1.2cqi 0.2cqi 0 color-mix(in srgb, var(--ct-bg) 25%, black),
+                   -3cqi 3cqi 6cqi rgba(0, 0, 0, 0.45);`
+              : wall
+                ? `border-radius: 0.4cqi;
                  box-shadow: 0 0.6cqi 1.2cqi rgba(0, 0, 0, 0.35), 0 3cqi 6cqi rgba(0, 0, 0, 0.35);`
-              : ""
+                : ""
           }
         }
         ${
@@ -516,11 +636,29 @@ class ClockInLettersCard extends HTMLElement {
           text-align: center;
           color: var(--ct-off);
           transition: color 1s ease, text-shadow 1s ease;
-          ${realistic ? "text-shadow: 0 0.03em 0 rgba(255, 255, 255, 0.07), 0 -0.03em 0 rgba(0, 0, 0, 0.25);" : ""}
+          ${realistic ? "text-shadow: -0.03em -0.03em 0 rgba(0, 0, 0, 0.3), 0.02em 0.02em 0 rgba(255, 255, 255, 0.06);" : ""}
         }
         .l.on {
           color: ${realistic ? "color-mix(in srgb, var(--ct-on) 85%, white)" : "var(--ct-on)"};
+          ${realistic ? "-webkit-text-stroke: 0.035em currentColor;" : ""}
           ${letterGlow}
+        }
+        ${
+          stencil
+            ? `
+        /* Stege wie bei ausgefrästen Buchstaben: oben und unten im O ausgeschnitten.
+           Das Innen-Element ist rundum 0.5em größer, damit der Leuchtschein nicht abgeschnitten wird. */
+        .l i.st {
+          display: inline-block;
+          font-style: normal;
+          padding: 0.5em;
+          margin: -0.5em;
+          --st-mask: linear-gradient(90deg, #000 calc(50% - 0.028em), transparent 0 calc(50% + 0.028em), #000 0),
+            linear-gradient(#000 0 30%, transparent 30% 37%, #000 37% 63%, transparent 63% 70%, #000 70%);
+          -webkit-mask-image: var(--st-mask);
+          mask-image: var(--st-mask);
+        }}`
+            : ""
         }
         ${
           realistic && glow
@@ -575,6 +713,7 @@ class ClockInLettersCard extends HTMLElement {
       </ha-card>
     `;
     this._cells = [...this.shadowRoot.querySelectorAll(".l")];
+    this._layout = layout;
     this._dots = [...this.shadowRoot.querySelectorAll(".dot")];
     this._face = this.shadowRoot.querySelector(".face");
     this._built = true;
@@ -590,7 +729,7 @@ class ClockInLettersCard extends HTMLElement {
     }
     this._cells.forEach((el, idx) => el.classList.toggle("on", lit.has(idx)));
     this._dots.forEach((el, idx) => el.classList.toggle("on", idx < dots));
-    this._face.setAttribute("aria-label", wordsToText(words));
+    this._face.setAttribute("aria-label", wordsToText(words, layoutOf(this._config).grid));
   }
 }
 
@@ -659,6 +798,9 @@ const LABELS = {
   rounded: "Abgerundete Ecken",
   padding: "Innenabstand (%)",
   realistic: "Realistische Darstellung",
+  view_3d: "3D-Ansicht (schräg mit Plattenkante)",
+  stencil: "Stege in O, Q, D (ausgefräst)",
+  language: "Sprache",
   finish: "Oberfläche",
   wall_mount: "An der Wand (mit Schatten)",
   dialect: "Viertel-Schreibweise",
@@ -708,7 +850,15 @@ const SCHEMA = [
           },
         },
       },
-      { name: "wall_mount", selector: { boolean: {} } },
+      {
+        type: "grid",
+        name: "",
+        schema: [
+          { name: "wall_mount", selector: { boolean: {} } },
+          { name: "view_3d", selector: { boolean: {} } },
+          { name: "stencil", selector: { boolean: {} } },
+        ],
+      },
     ],
   },
   {
@@ -790,9 +940,21 @@ const SCHEMA = [
     type: "expandable",
     name: "sprache",
     flatten: true,
-    title: "Sprechweise",
+    title: "Sprache & Sprechweise",
     icon: "mdi:message-text-clock",
     schema: [
+      {
+        name: "language",
+        selector: {
+          select: {
+            mode: "dropdown",
+            options: [
+              { value: "de", label: "Deutsch" },
+              { value: "en", label: "English" },
+            ],
+          },
+        },
+      },
       {
         name: "dialect",
         selector: {
@@ -842,4 +1004,4 @@ console.info(
   "color: #fff; background: #111;"
 );
 
-if (typeof module !== "undefined") module.exports = { computeWords, wordsToText, toCss, toRgb, resolveFont, withTheme, THEMES };
+if (typeof module !== "undefined") module.exports = { GRID_EN, computeWords, wordsToText, toCss, toRgb, resolveFont, withTheme, THEMES };
