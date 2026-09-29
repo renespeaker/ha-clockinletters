@@ -5,7 +5,7 @@
  * plus vier Eck-Punkte für die Minuten zwischen den 5-Minuten-Schritten.
  */
 
-const CARD_VERSION = "1.4.0";
+const CARD_VERSION = "1.5.0";
 
 const GRID = [
   "ESKISTAFÜNF",
@@ -75,6 +75,10 @@ const DEFAULTS = {
   wall_mount: false, // Uhr schwebt mit Schatten auf der Karte wie an der Wand
   view_3d: false, // schräge Ansicht mit sichtbarer Plattenkante
   stencil: true, // Stege in O, Ö, Q, D wie bei ausgefrästen Buchstaben
+  fit_screen: true, // Uhr nie höher als der Bildschirm (wichtig bei Panel-Ansicht / großen Monitoren)
+  tap_action: "fullscreen", // fullscreen: Antippen schaltet Vollbild um – none: nichts
+  fullscreen_background: [0, 0, 0], // Hintergrund im Vollbild
+  keep_awake: true, // Bildschirm im Vollbild nicht ausschalten (wenn der Browser es unterstützt)
 };
 
 // Farb-Vorlagen: setzen Farben, Deckkraft und Leucht-Effekt.
@@ -177,18 +181,21 @@ const FINISHES = {
   flach: "",
   glanz: "",
   matt: `background-image: ${noise("1.2", 2, 0.55, 200)}, ${noise("0.01", 3, 0.35, 500)};
+    background-size: 60cqi 60cqi, 150cqi 150cqi;
     background-blend-mode: soft-light, soft-light;`,
   gebuerstet: `
     background-image: linear-gradient(100deg, rgba(255,255,255,0.18), rgba(0,0,0,0.12) 35%, rgba(255,255,255,0.14) 60%, rgba(0,0,0,0.18)),
       ${noise("0.0015 0.9", 3, 0.6)};
-    background-size: 100% 100%, 400px 400px;
+    background-size: 100% 100%, 120cqi 120cqi;
     background-blend-mode: soft-light, overlay;`,
   holz: `
     background-image: ${noise("0.004 0.09", 4, 1, 500)}, ${noise("0.02 0.5", 2, 0.6, 300)};
+    background-size: 150cqi 150cqi, 90cqi 90cqi;
     background-blend-mode: overlay, soft-light;`,
   rost: `
     background-image: ${noise("0.012", 5, 1, 500)}, ${noise("0.09", 4, 0.8, 300)},
       radial-gradient(circle at 30% 25%, rgba(200, 110, 40, 0.5), transparent 60%);
+    background-size: 150cqi 150cqi, 90cqi 90cqi, 100% 100%;
     background-blend-mode: overlay, soft-light, normal;`,
 };
 
@@ -493,11 +500,96 @@ class ClockInLettersCard extends HTMLElement {
   connectedCallback() {
     this._render();
     this._schedule();
+    if (!this._listening) {
+      this._listening = true;
+      this._onClick = () => {
+        // Im Dashboard-Editor kein Vollbild auslösen
+        if (this.preview || this.editMode) return;
+        if ((this._config && this._config.tap_action) === "fullscreen") this._toggleFullscreen();
+      };
+      this._onKey = (ev) => {
+        if (ev.key === "Escape" && this._fs) this._exitFullscreen();
+      };
+      this._onFsChange = () => {
+        const el = document.fullscreenElement || document.webkitFullscreenElement;
+        if (!el && this._fs && this._nativeFs) this._exitFullscreen();
+      };
+      // Nach Standby / Tab-Wechsel sofort die richtige Zeit zeigen
+      this._onVisible = () => {
+        if (document.visibilityState === "visible") {
+          this._update();
+          this._schedule();
+          if (this._fs) this._requestWakeLock();
+        }
+      };
+      this.addEventListener("click", this._onClick);
+      document.addEventListener("keydown", this._onKey);
+      document.addEventListener("fullscreenchange", this._onFsChange);
+      document.addEventListener("webkitfullscreenchange", this._onFsChange);
+      document.addEventListener("visibilitychange", this._onVisible);
+    }
   }
 
   disconnectedCallback() {
     clearTimeout(this._timer);
     this._timer = null;
+    if (this._listening) {
+      this._listening = false;
+      this.removeEventListener("click", this._onClick);
+      document.removeEventListener("keydown", this._onKey);
+      document.removeEventListener("fullscreenchange", this._onFsChange);
+      document.removeEventListener("webkitfullscreenchange", this._onFsChange);
+      document.removeEventListener("visibilitychange", this._onVisible);
+    }
+    if (this._fs) this._exitFullscreen();
+  }
+
+  _toggleFullscreen() {
+    if (this._fs) this._exitFullscreen();
+    else this._enterFullscreen();
+  }
+
+  _enterFullscreen() {
+    this._fs = true;
+    // Immer: Karte füllt das Fenster (funktioniert auch in der Companion-App und auf dem iPhone)
+    this.classList.add("fs");
+    // Zusätzlich echtes Vollbild, damit Browserleisten verschwinden
+    const req = this.requestFullscreen || this.webkitRequestFullscreen;
+    this._nativeFs = false;
+    if (req) {
+      try {
+        const res = req.call(this, { navigationUI: "hide" });
+        this._nativeFs = true;
+        if (res && res.catch) res.catch(() => (this._nativeFs = false));
+      } catch (e) {
+        this._nativeFs = false;
+      }
+    }
+    this._requestWakeLock();
+  }
+
+  _exitFullscreen() {
+    this._fs = false;
+    this.classList.remove("fs");
+    const el = document.fullscreenElement || document.webkitFullscreenElement;
+    if (el === this) {
+      const exit = document.exitFullscreen || document.webkitExitFullscreen;
+      if (exit) Promise.resolve(exit.call(document)).catch(() => {});
+    }
+    this._nativeFs = false;
+    if (this._wakeLock) {
+      this._wakeLock.release().catch(() => {});
+      this._wakeLock = null;
+    }
+  }
+
+  async _requestWakeLock() {
+    if (!this._config || !this._config.keep_awake || !navigator.wakeLock) return;
+    try {
+      this._wakeLock = await navigator.wakeLock.request("screen");
+    } catch (e) {
+      // z. B. ohne HTTPS nicht erlaubt – dann eben ohne
+    }
   }
 
   _schedule() {
@@ -528,6 +620,9 @@ class ClockInLettersCard extends HTMLElement {
     const view3d = realistic && c.view_3d;
     const stencil = realistic && c.stencil !== false;
     const layout = layoutOf(c);
+    const fit = c.fit_screen !== false;
+    const framed = wall || view3d;
+    const fsBg = toCss(c.fullscreen_background, DEFAULTS.fullscreen_background);
 
     const letters = layout.grid
       .map(
@@ -559,6 +654,7 @@ class ClockInLettersCard extends HTMLElement {
       <style>
         :host {
           display: block;
+          ${c.tap_action === "fullscreen" ? "cursor: pointer;" : ""}
           --ct-on: ${on};
           --ct-off: ${off};
           --ct-bg: ${bg};
@@ -566,12 +662,61 @@ class ClockInLettersCard extends HTMLElement {
         ha-card {
           display: block;
           overflow: hidden;
-          ${wall || view3d ? "" : "background: var(--ct-bg);"}
+          ${framed ? "" : "background: var(--ct-bg);"}
           ${c.rounded ? "" : "border-radius: 0;"}
         }
         .wrap {
-          padding: ${wall || view3d ? "8%" : "0"};
+          box-sizing: border-box;
+          padding: ${framed ? "8%" : "0"};
+          margin: 0 auto;
           ${view3d ? "perspective: 1400px;" : ""}
+          /* Nie höher als der sichtbare Bildschirm (Kopfzeile von HA abgezogen) */
+          ${fit ? "max-width: calc(100dvh - var(--header-height, 56px) - 16px);" : ""}
+        }
+        ${
+          fit && !framed
+            ? `
+        /* Die Platte trägt ihre Farbe selbst – ist die Uhr schmaler als die Karte
+           (Panel-Ansicht, breite Monitore), bleibt sie quadratisch und zentriert */
+        ha-card {
+          background: transparent;
+          border: none;
+          box-shadow: none;
+        }
+        .face {
+          border-radius: ${c.rounded ? "var(--ha-card-border-radius, 12px)" : "0"};
+          overflow: hidden;
+        }`
+            : ""
+        }
+        /* Vollbild: Uhr zentriert, so groß wie möglich, auf jedem Bildschirm quadratisch */
+        :host(.fs) {
+          position: fixed;
+          inset: 0;
+          z-index: 10000;
+          width: 100vw;
+          height: 100dvh;
+          background: ${fsBg};
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          cursor: none;
+        }
+        :host(.fs) ha-card {
+          background: transparent;
+          border: none;
+          box-shadow: none;
+          border-radius: 0;
+          overflow: visible;
+        }
+        :host(.fs) .wrap {
+          width: min(94vw, 94dvh);
+          max-width: none;
+          padding: ${framed ? "4%" : "0"};
+        }
+        :host(.fs) .face {
+          border-radius: 0.4cqi;
+          ${framed ? "" : "box-shadow: 0 0 6cqi rgba(0, 0, 0, 0.5);"}
         }
         .face {
           position: relative;
@@ -772,7 +917,7 @@ class ClockInLettersCardEditor extends HTMLElement {
     this._form.hass = this._hass;
     this._form.schema = SCHEMA;
     const data = withTheme(this._config);
-    for (const key of ["color_on", "color_off", "background"]) data[key] = toRgb(data[key]);
+    for (const key of ["color_on", "color_off", "background", "fullscreen_background"]) data[key] = toRgb(data[key]);
     if (typeof data.padding === "string") data.padding = parseFloat(data.padding) || DEFAULTS.padding;
     this._form.data = data;
   }
@@ -801,6 +946,10 @@ const LABELS = {
   view_3d: "3D-Ansicht (schräg mit Plattenkante)",
   stencil: "Stege in O, Q, D (ausgefräst)",
   language: "Sprache",
+  fit_screen: "An Bildschirmhöhe anpassen",
+  tap_action: "Beim Antippen",
+  fullscreen_background: "Hintergrund im Vollbild",
+  keep_awake: "Bildschirm im Vollbild wach halten",
   finish: "Oberfläche",
   wall_mount: "An der Wand (mit Schatten)",
   dialect: "Viertel-Schreibweise",
@@ -934,6 +1083,36 @@ const SCHEMA = [
         ],
       },
       { name: "padding", selector: slider(0, 20) },
+    ],
+  },
+  {
+    type: "expandable",
+    name: "bildschirm",
+    flatten: true,
+    title: "Bildschirm & Vollbild",
+    icon: "mdi:monitor-screenshot",
+    schema: [
+      {
+        name: "tap_action",
+        selector: {
+          select: {
+            mode: "dropdown",
+            options: [
+              { value: "fullscreen", label: "Vollbild ein/aus" },
+              { value: "none", label: "Nichts" },
+            ],
+          },
+        },
+      },
+      { name: "fullscreen_background", selector: { color_rgb: {} } },
+      {
+        type: "grid",
+        name: "",
+        schema: [
+          { name: "fit_screen", selector: { boolean: {} } },
+          { name: "keep_awake", selector: { boolean: {} } },
+        ],
+      },
     ],
   },
   {

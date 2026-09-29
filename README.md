@@ -59,6 +59,34 @@ font_family: Barlow
 font_size: 85
 ```
 
+## Große Monitore, Tablets & Vollbild
+
+Die Uhr ist komplett vektorbasiert und skaliert auf jede Größe und Auflösung
+(Handy, Full HD, 4K, Retina) – Schrift, Leuchten und Oberflächenstruktur
+wachsen mit.
+
+- **An Bildschirmhöhe anpassen** (`fit_screen`, Standard an): Die Uhr wird nie
+  höher als der sichtbare Bildschirm und bleibt auf breiten Monitoren quadratisch
+  und zentriert.
+- **Vollbild:** Uhr antippen/anklicken → Vollbild, erneut antippen oder `Esc` →
+  zurück. Im Vollbild wird die Uhr so groß wie möglich dargestellt, der
+  Mauszeiger ausgeblendet und der Bildschirm wach gehalten (sofern der Browser
+  das unterstützt, benötigt HTTPS).
+- Nach Standby oder Tab-Wechsel zeigt die Uhr sofort wieder die richtige Zeit.
+
+**Tipp für ein Wand-Tablet oder einen Monitor:** Eine eigene Dashboard-Ansicht
+vom Typ **Panel** anlegen und nur diese Karte hineinlegen – dann füllt die Uhr
+die ganze Ansicht:
+
+```yaml
+views:
+  - title: Uhr
+    type: panel
+    cards:
+      - type: custom:clockinletters-card
+        theme: oliv
+```
+
 ## Farb-Vorlagen
 
 ![Farb-Vorlagen](themes.png)
@@ -80,6 +108,10 @@ wall_mount: true
 | `view_3d`       | `false`           | Schräge 3D-Ansicht mit sichtbarer Plattenkante |
 | `stencil`       | `true`            | Stege in O, Ö, Q, D wie bei ausgefrästen Buchstaben |
 | `language`      | `de`              | Sprache des Buchstabenrasters: `de` oder `en` |
+| `fit_screen`    | `true`            | Uhr nie höher als der Bildschirm (quadratisch, zentriert) |
+| `tap_action`    | `fullscreen`      | Beim Antippen: `fullscreen` (Vollbild ein/aus) oder `none` |
+| `fullscreen_background` | `[0, 0, 0]` | Hintergrund im Vollbild |
+| `keep_awake`    | `true`            | Bildschirm im Vollbild wach halten |
 | `font_family`   | `Barlow`          | Schriftart: `Barlow` (DIN-ähnlich, Google Fonts), `Helvetica Neue`, `Roboto`, `Arial`, `Verdana`, `Trebuchet MS`, `Georgia`, `Times New Roman`, `Courier New` oder eine Google-Schrift (`Barlow`, `Josefin Sans`, `Montserrat`, `Raleway`, `Poppins`, `Oswald`, `Quicksand`, `Comfortaa`, `Orbitron`, `Playfair Display`, `Roboto Mono`). Auch jeder andere CSS-Schriftname ist möglich. |
 | `font_size`     | `85`              | Schriftgröße in % (50–130) |
 | `font_weight`   | `"400"`           | Schriftstärke `"100"` (hauchdünn) bis `"900"` (extra fett) |
