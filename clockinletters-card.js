@@ -5,7 +5,7 @@
  * plus vier Eck-Punkte für die Minuten zwischen den 5-Minuten-Schritten.
  */
 
-const CARD_VERSION = "1.2.0";
+const CARD_VERSION = "1.3.0";
 
 const GRID = [
   "ESKISTAFÜNF",
@@ -69,56 +69,76 @@ const DEFAULTS = {
   font_weight: "300",
   rounded: true,
   padding: 8, // Innenabstand in %
+  realistic: true, // Oberfläche, Lichtreflex und LED-Leuchten wie bei einer echten Wortuhr
+  finish: "auto", // Oberfläche: auto (passend zur Vorlage), glanz, gebuerstet, matt, holz, rost, flach
+  wall_mount: false, // Uhr schwebt mit Schatten auf der Karte wie an der Wand
 };
 
 // Farb-Vorlagen: setzen Farben, Deckkraft und Leucht-Effekt.
 // Einzelne Werte in der Konfiguration überschreiben die Vorlage.
 const THEMES = {
   schwarz: {
+    finish: "glanz",
     label: "⚫ Schwarz",
     values: { background: [17, 17, 17], color_on: [255, 255, 255], color_off: [255, 255, 255], off_opacity: 15, glow: true, glow_strength: 35 },
   },
   weiss: {
+    finish: "glanz",
     label: "⚪ Weiß",
     values: { background: [242, 241, 237], color_on: [25, 25, 25], color_off: [0, 0, 0], off_opacity: 10, glow: false, glow_strength: 35 },
   },
   messing: {
+    finish: "gebuerstet",
     label: "🟡 Messing",
-    values: { background: [201, 162, 39], color_on: [26, 26, 26], color_off: [0, 0, 0], off_opacity: 15, glow: false, glow_strength: 35 },
+    values: { background: [168, 134, 58], color_on: [22, 20, 16], color_off: [0, 0, 0], off_opacity: 15, glow: false, glow_strength: 35 },
   },
   gold: {
+    finish: "glanz",
     label: "✨ Gold auf Schwarz",
     values: { background: [20, 18, 14], color_on: [240, 196, 90], color_off: [240, 196, 90], off_opacity: 12, glow: true, glow_strength: 45 },
   },
   kupfer: {
+    finish: "gebuerstet",
     label: "🟠 Kupfer",
-    values: { background: [184, 115, 51], color_on: [255, 240, 222], color_off: [0, 0, 0], off_opacity: 18, glow: true, glow_strength: 25 },
+    values: { background: [150, 82, 48], color_on: [255, 240, 222], color_off: [0, 0, 0], off_opacity: 18, glow: true, glow_strength: 25 },
   },
   edelstahl: {
+    finish: "gebuerstet",
     label: "🔘 Edelstahl",
     values: { background: [170, 174, 178], color_on: [18, 18, 18], color_off: [0, 0, 0], off_opacity: 12, glow: false, glow_strength: 35 },
   },
   walnuss: {
+    finish: "holz",
     label: "🟤 Walnuss",
     values: { background: [86, 58, 38], color_on: [255, 214, 150], color_off: [0, 0, 0], off_opacity: 25, glow: true, glow_strength: 35 },
   },
   rot: {
+    finish: "glanz",
     label: "🔴 Rot",
     values: { background: [165, 22, 32], color_on: [255, 255, 255], color_off: [0, 0, 0], off_opacity: 20, glow: true, glow_strength: 30 },
   },
   nachtblau: {
+    finish: "matt",
     label: "🔵 Nachtblau",
     values: { background: [10, 25, 45], color_on: [120, 200, 255], color_off: [255, 255, 255], off_opacity: 10, glow: true, glow_strength: 60 },
   },
   matrix: {
+    finish: "matt",
     label: "🟢 Matrix",
     values: { background: [4, 14, 6], color_on: [70, 255, 120], color_off: [70, 255, 120], off_opacity: 10, glow: true, glow_strength: 50 },
   },
+  rost: {
+    finish: "rost",
+    label: "🧱 Rost",
+    values: { background: [122, 62, 30], color_on: [255, 236, 212], color_off: [20, 8, 0], off_opacity: 30, glow: true, glow_strength: 35 },
+  },
   pink: {
+    finish: "glanz",
     label: "🩷 Pink",
     values: { background: [225, 85, 145], color_on: [255, 255, 255], color_off: [0, 0, 0], off_opacity: 15, glow: true, glow_strength: 30 },
   },
   ha: {
+    finish: "matt",
     label: "🏠 Home-Assistant-Theme",
     values: {
       background: "var(--ha-card-background, var(--card-background-color))",
@@ -130,6 +150,49 @@ const THEMES = {
     },
   },
 };
+// Oberflächen als SVG-Rauschen (keine Bilddateien nötig)
+function noise(baseFrequency, octaves, alpha, size = 400) {
+  const svg =
+    `<svg xmlns='http://www.w3.org/2000/svg' width='${size}' height='${size}'>` +
+    `<filter id='n'><feTurbulence type='fractalNoise' baseFrequency='${baseFrequency}' numOctaves='${octaves}' stitchTiles='stitch'/>` +
+    `<feColorMatrix values='0.33 0.33 0.33 0 0 0.33 0.33 0.33 0 0 0.33 0.33 0.33 0 0 0 0 0 0 ${alpha}'/></filter>` +
+    `<rect width='100%' height='100%' filter='url(#n)'/></svg>`;
+  return `url("data:image/svg+xml;utf8,${encodeURIComponent(svg)}")`;
+}
+
+const FINISHES = {
+  flach: "",
+  glanz: "",
+  matt: `background-image: ${noise("0.8", 2, 0.35, 200)}; background-blend-mode: soft-light;`,
+  gebuerstet: `
+    background-image: linear-gradient(100deg, rgba(255,255,255,0.18), rgba(0,0,0,0.12) 35%, rgba(255,255,255,0.14) 60%, rgba(0,0,0,0.18)),
+      ${noise("0.0015 0.9", 3, 0.6)};
+    background-size: 100% 100%, 400px 400px;
+    background-blend-mode: soft-light, overlay;`,
+  holz: `
+    background-image: ${noise("0.004 0.09", 4, 1, 500)}, ${noise("0.02 0.5", 2, 0.6, 300)};
+    background-blend-mode: overlay, soft-light;`,
+  rost: `
+    background-image: ${noise("0.012", 5, 1, 500)}, ${noise("0.09", 4, 0.8, 300)},
+      radial-gradient(circle at 30% 25%, rgba(200, 110, 40, 0.5), transparent 60%);
+    background-blend-mode: overlay, soft-light, normal;`,
+};
+
+const SHEENS = {
+  glanz:
+    "linear-gradient(125deg, rgba(255,255,255,0.13) 0%, rgba(255,255,255,0.05) 38%, rgba(255,255,255,0) 38.5%, rgba(255,255,255,0) 100%)",
+  gebuerstet: "linear-gradient(160deg, rgba(255,255,255,0.12), rgba(255,255,255,0) 45%, rgba(0,0,0,0.12))",
+  matt: "radial-gradient(circle at 30% 20%, rgba(255,255,255,0.06), rgba(0,0,0,0.12) 90%)",
+  holz: "linear-gradient(160deg, rgba(255,255,255,0.07), rgba(0,0,0,0.15))",
+  rost: "radial-gradient(circle at 30% 20%, rgba(255,255,255,0.05), rgba(0,0,0,0.25) 95%)",
+};
+
+function resolveFinish(config) {
+  if (config.finish && config.finish !== "auto") return config.finish;
+  const theme = THEMES[config.theme];
+  return (theme && theme.finish) || "glanz";
+}
+
 const THEME_KEYS = ["background", "color_on", "color_off", "off_opacity", "glow", "glow_strength"];
 
 /** Konfiguration mit Standardwerten und Farb-Vorlage zusammenführen. */
@@ -358,6 +421,9 @@ class ClockInLettersCard extends HTMLElement {
     const fontSize = (6 * clamp(c.font_size, 30, 150, 100)) / 100;
     const glow = c.glow ? clamp(c.glow_strength, 0, 100, DEFAULTS.glow_strength) / 100 : 0;
     const padding = typeof c.padding === "string" ? c.padding : `${clamp(c.padding, 0, 25, 8)}%`;
+    const realistic = c.realistic !== false;
+    const finish = realistic ? resolveFinish(c) : "flach";
+    const wall = realistic && c.wall_mount;
 
     const letters = GRID.map(
       (row, r) =>
@@ -370,6 +436,14 @@ class ClockInLettersCard extends HTMLElement {
       ? [1, 2, 3, 4].map((n) => `<span class="dot d${n}"></span>`).join("")
       : "";
 
+    // Leuchten: im realistischen Modus mehrlagig wie eine hinterleuchtete LED
+    const letterGlow = !glow
+      ? ""
+      : realistic
+        ? `text-shadow: 0 0 ${0.06 + glow * 0.08}em var(--ct-on), 0 0 ${glow * 0.3}em var(--ct-on),
+             0 0 ${glow * 0.8}em color-mix(in srgb, var(--ct-on) 55%, transparent);`
+        : `text-shadow: 0 0 ${glow}em var(--ct-on);`;
+
     this.shadowRoot.innerHTML = `
       <style>
         :host {
@@ -380,9 +454,12 @@ class ClockInLettersCard extends HTMLElement {
         }
         ha-card {
           display: block;
-          background: var(--ct-bg);
           overflow: hidden;
+          ${wall ? "" : "background: var(--ct-bg);"}
           ${c.rounded ? "" : "border-radius: 0;"}
+        }
+        .wrap {
+          padding: ${wall ? "8%" : "0"};
         }
         .face {
           position: relative;
@@ -390,10 +467,36 @@ class ClockInLettersCard extends HTMLElement {
           width: 100%;
           container-type: inline-size;
           box-sizing: border-box;
+          background-color: var(--ct-bg);
+          ${FINISHES[finish] || ""}
+          ${
+            wall
+              ? `border-radius: 0.4cqi;
+                 box-shadow: 0 0.6cqi 1.2cqi rgba(0, 0, 0, 0.35), 0 3cqi 6cqi rgba(0, 0, 0, 0.35);`
+              : ""
+          }
+        }
+        ${
+          realistic
+            ? `
+        /* Kanten-Licht und Lichtreflex auf der Frontplatte */
+        .face::after {
+          content: "";
+          position: absolute;
+          inset: 0;
+          border-radius: inherit;
+          pointer-events: none;
+          z-index: 2;
+          box-shadow: inset 0 0.25cqi 0 rgba(255, 255, 255, 0.14), inset 0 -0.35cqi 0.6cqi rgba(0, 0, 0, 0.3),
+            inset 0 0 8cqi rgba(0, 0, 0, 0.18);
+          background: ${SHEENS[finish] || "none"};
+        }`
+            : ""
         }
         .grid {
           position: absolute;
           inset: ${padding};
+          z-index: 1;
           display: flex;
           flex-direction: column;
           justify-content: space-between;
@@ -408,26 +511,54 @@ class ClockInLettersCard extends HTMLElement {
           justify-content: space-between;
         }
         .l {
+          position: relative;
           flex: 1 1 0;
           text-align: center;
           color: var(--ct-off);
-          transition: color 0.8s ease, text-shadow 0.8s ease;
+          transition: color 1s ease, text-shadow 1s ease;
+          ${realistic ? "text-shadow: 0 0.03em 0 rgba(255, 255, 255, 0.07), 0 -0.03em 0 rgba(0, 0, 0, 0.25);" : ""}
         }
         .l.on {
-          color: var(--ct-on);
-          ${glow ? `text-shadow: 0 0 ${glow}em var(--ct-on);` : ""}
+          color: ${realistic ? "color-mix(in srgb, var(--ct-on) 85%, white)" : "var(--ct-on)"};
+          ${letterGlow}
+        }
+        ${
+          realistic && glow
+            ? `
+        /* Licht, das hinter dem Buchstaben auf die Platte strahlt */
+        .l::before {
+          content: "";
+          position: absolute;
+          left: 50%;
+          top: 50%;
+          width: 2.2em;
+          height: 2.2em;
+          transform: translate(-50%, -50%);
+          border-radius: 50%;
+          background: radial-gradient(closest-side, color-mix(in srgb, var(--ct-on) 45%, transparent), transparent);
+          opacity: 0;
+          z-index: -1;
+          transition: opacity 1s ease;
+          pointer-events: none;
+        }
+        .l.on::before {
+          opacity: ${Math.min(1, glow * 0.9)};
+        }`
+            : ""
         }
         .dot {
           position: absolute;
+          z-index: 1;
           width: 1.4cqi;
           height: 1.4cqi;
           border-radius: 50%;
           background: var(--ct-off);
-          transition: background 0.8s ease, box-shadow 0.8s ease;
+          transition: background 1s ease, box-shadow 1s ease;
+          ${realistic ? "box-shadow: inset 0 0.2cqi 0.3cqi rgba(0, 0, 0, 0.5), 0 0.1cqi 0 rgba(255, 255, 255, 0.1);" : ""}
         }
         .dot.on {
-          background: var(--ct-on);
-          ${glow ? `box-shadow: 0 0 ${glow * 4}cqi var(--ct-on);` : ""}
+          background: ${realistic ? "color-mix(in srgb, var(--ct-on) 85%, white)" : "var(--ct-on)"};
+          ${glow ? `box-shadow: 0 0 ${glow * 1.5}cqi var(--ct-on), 0 0 ${glow * 4}cqi var(--ct-on);` : ""}
         }
         .d1 { top: 3.3cqi; left: 3.3cqi; }
         .d2 { top: 3.3cqi; right: 3.3cqi; }
@@ -435,9 +566,11 @@ class ClockInLettersCard extends HTMLElement {
         .d4 { bottom: 3.3cqi; left: 3.3cqi; }
       </style>
       <ha-card>
-        <div class="face" role="img">
-          ${dots}
-          <div class="grid">${letters}</div>
+        <div class="wrap">
+          <div class="face" role="img">
+            ${dots}
+            <div class="grid">${letters}</div>
+          </div>
         </div>
       </ha-card>
     `;
@@ -525,6 +658,9 @@ const LABELS = {
   show_es_ist: "„ES IST“ anzeigen",
   rounded: "Abgerundete Ecken",
   padding: "Innenabstand (%)",
+  realistic: "Realistische Darstellung",
+  finish: "Oberfläche",
+  wall_mount: "An der Wand (mit Schatten)",
   dialect: "Viertel-Schreibweise",
   zwanzig: "20 / 40 Minuten",
 };
@@ -548,11 +684,39 @@ const SCHEMA = [
   },
   {
     type: "expandable",
+    name: "look",
+    flatten: true,
+    title: "Material & Look",
+    icon: "mdi:texture-box",
+    expanded: true,
+    schema: [
+      { name: "realistic", selector: { boolean: {} } },
+      {
+        name: "finish",
+        selector: {
+          select: {
+            mode: "dropdown",
+            options: [
+              { value: "auto", label: "Automatisch (passend zur Farb-Vorlage)" },
+              { value: "glanz", label: "Hochglanz (Acryl)" },
+              { value: "gebuerstet", label: "Gebürstetes Metall" },
+              { value: "matt", label: "Matt" },
+              { value: "holz", label: "Holz" },
+              { value: "rost", label: "Rost-Patina" },
+              { value: "flach", label: "Flach (ohne Struktur)" },
+            ],
+          },
+        },
+      },
+      { name: "wall_mount", selector: { boolean: {} } },
+    ],
+  },
+  {
+    type: "expandable",
     name: "schrift",
     flatten: true,
     title: "Schrift",
     icon: "mdi:format-font",
-    expanded: true,
     schema: [
       {
         name: "font_family",

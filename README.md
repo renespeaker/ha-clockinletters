@@ -6,7 +6,7 @@ Ecken zeigen die Minuten zwischen den 5-Minuten-Schritten an.
 
 ![Screenshot](screenshot.png)
 
-*(Standard, Messing mit Georgia und Blau mit Josefin Sans – jeweils um 21:38 Uhr:
+*(Schwarz Hochglanz, Walnuss und Kupfer an der Wand – jeweils um 21:38 Uhr:
 „ES IST FÜNF NACH HALB ZEHN“ + 3 Punkte)*
 
 ## Installation
@@ -31,8 +31,11 @@ Im Dashboard **Karte hinzufügen → „Clock in Letters“** auswählen. Der
 Karten-Editor hat aufklappbare Menüs, in denen du alles einstellen kannst:
 
 - **Schrift** – Schriftart (Auswahlliste oder eigener Name), Schriftgröße, Schriftstärke
+- **Material & Look** – realistische Darstellung (Oberflächenstruktur, Lichtreflex,
+  LED-Leuchten, das auf die Platte strahlt), Oberfläche (Hochglanz, gebürstetes
+  Metall, Matt, Holz, Rost) und Wandmontage mit Schatten
 - **Farb-Vorlage** – Schwarz, Weiß, Messing, Gold auf Schwarz, Kupfer, Edelstahl,
-  Walnuss, Rot, Nachtblau, Matrix, Pink oder die Farben deines Home-Assistant-Themes
+  Walnuss, Rost, Rot, Nachtblau, Matrix, Pink oder die Farben deines Home-Assistant-Themes
 - **Farben** – Farbwähler für aktive und inaktive Buchstaben und den Hintergrund,
   Deckkraft der inaktiven Buchstaben, Leucht-Effekt und dessen Stärke
 - **Anzeige** – Minuten-Punkte, „ES IST“, abgerundete Ecken, Innenabstand
@@ -65,13 +68,17 @@ glow_strength: 60
 ```yaml
 type: custom:clockinletters-card
 theme: kupfer
+wall_mount: true
 ```
 
 ## Optionen
 
 | Option          | Standard          | Beschreibung |
 |-----------------|-------------------|--------------|
-| `theme`         | `schwarz`         | Farb-Vorlage: `schwarz`, `weiss`, `messing`, `gold`, `kupfer`, `edelstahl`, `walnuss`, `rot`, `nachtblau`, `matrix`, `pink`, `ha` (Farben des HA-Themes) oder `eigene`. Einzeln gesetzte Farben überschreiben die Vorlage. |
+| `theme`         | `schwarz`         | Farb-Vorlage: `schwarz`, `weiss`, `messing`, `gold`, `kupfer`, `edelstahl`, `walnuss`, `rost`, `rot`, `nachtblau`, `matrix`, `pink`, `ha` (Farben des HA-Themes) oder `eigene`. Einzeln gesetzte Farben überschreiben die Vorlage. |
+| `realistic`     | `true`            | Realistische Darstellung: Oberflächenstruktur, Lichtreflex, Kanten und LED-Leuchten |
+| `finish`        | `auto`            | Oberfläche: `auto` (passend zur Vorlage), `glanz`, `gebuerstet`, `matt`, `holz`, `rost`, `flach` |
+| `wall_mount`    | `false`           | Uhr hängt mit Schatten auf der Karte wie an der Wand (Kartenhintergrund = Wand) |
 | `font_family`   | `Helvetica Neue`  | Schriftart: `Helvetica Neue`, `Roboto`, `Arial`, `Verdana`, `Trebuchet MS`, `Georgia`, `Times New Roman`, `Courier New` oder eine Google-Schrift (`Josefin Sans`, `Montserrat`, `Raleway`, `Poppins`, `Oswald`, `Quicksand`, `Comfortaa`, `Orbitron`, `Playfair Display`, `Roboto Mono`). Auch jeder andere CSS-Schriftname ist möglich. |
 | `font_size`     | `100`             | Schriftgröße in % (50–130) |
 | `font_weight`   | `"300"`           | Schriftstärke `"100"` (hauchdünn) bis `"900"` (extra fett) |
