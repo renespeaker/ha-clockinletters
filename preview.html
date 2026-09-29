@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Clock in Letters</title>
+<style>
+  body { margin: 0; background: #2b2b2b; display: flex; gap: 24px; flex-wrap: wrap; justify-content: center; padding: 24px; }
+  clockinletters-card { width: 360px; max-width: 100%; }
+</style>
+</head>
+<body>
+  <clockinletters-card id="a"></clockinletters-card>
+  <clockinletters-card id="b"></clockinletters-card>
+  <script src="clockinletters-card.js"></script>
+  <script>
+    document.getElementById("a").setConfig({});
+    document.getElementById("b").setConfig({
+      background: "#c9a227", color_on: "#1a1a1a", color_off: "rgba(0,0,0,0.15)", glow: false
+    });
+  </script>
+</body>
+</html>
