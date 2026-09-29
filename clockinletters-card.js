@@ -5,7 +5,7 @@
  * plus vier Eck-Punkte für die Minuten zwischen den 5-Minuten-Schritten.
  */
 
-const CARD_VERSION = "1.1.0";
+const CARD_VERSION = "1.2.0";
 
 const GRID = [
   "ESKISTAFÜNF",
@@ -52,6 +52,7 @@ const HOURS = [
 const HOUR_EIN = [5, 0, 3]; // "EIN UHR"
 
 const DEFAULTS = {
+  theme: "schwarz", // Farb-Vorlage, siehe THEMES
   // Farben: [r, g, b] (Farbwähler im Editor) oder beliebiger CSS-Farbwert
   color_on: [255, 255, 255],
   color_off: [255, 255, 255],
@@ -69,6 +70,73 @@ const DEFAULTS = {
   rounded: true,
   padding: 8, // Innenabstand in %
 };
+
+// Farb-Vorlagen: setzen Farben, Deckkraft und Leucht-Effekt.
+// Einzelne Werte in der Konfiguration überschreiben die Vorlage.
+const THEMES = {
+  schwarz: {
+    label: "⚫ Schwarz",
+    values: { background: [17, 17, 17], color_on: [255, 255, 255], color_off: [255, 255, 255], off_opacity: 15, glow: true, glow_strength: 35 },
+  },
+  weiss: {
+    label: "⚪ Weiß",
+    values: { background: [242, 241, 237], color_on: [25, 25, 25], color_off: [0, 0, 0], off_opacity: 10, glow: false, glow_strength: 35 },
+  },
+  messing: {
+    label: "🟡 Messing",
+    values: { background: [201, 162, 39], color_on: [26, 26, 26], color_off: [0, 0, 0], off_opacity: 15, glow: false, glow_strength: 35 },
+  },
+  gold: {
+    label: "✨ Gold auf Schwarz",
+    values: { background: [20, 18, 14], color_on: [240, 196, 90], color_off: [240, 196, 90], off_opacity: 12, glow: true, glow_strength: 45 },
+  },
+  kupfer: {
+    label: "🟠 Kupfer",
+    values: { background: [184, 115, 51], color_on: [255, 240, 222], color_off: [0, 0, 0], off_opacity: 18, glow: true, glow_strength: 25 },
+  },
+  edelstahl: {
+    label: "🔘 Edelstahl",
+    values: { background: [170, 174, 178], color_on: [18, 18, 18], color_off: [0, 0, 0], off_opacity: 12, glow: false, glow_strength: 35 },
+  },
+  walnuss: {
+    label: "🟤 Walnuss",
+    values: { background: [86, 58, 38], color_on: [255, 214, 150], color_off: [0, 0, 0], off_opacity: 25, glow: true, glow_strength: 35 },
+  },
+  rot: {
+    label: "🔴 Rot",
+    values: { background: [165, 22, 32], color_on: [255, 255, 255], color_off: [0, 0, 0], off_opacity: 20, glow: true, glow_strength: 30 },
+  },
+  nachtblau: {
+    label: "🔵 Nachtblau",
+    values: { background: [10, 25, 45], color_on: [120, 200, 255], color_off: [255, 255, 255], off_opacity: 10, glow: true, glow_strength: 60 },
+  },
+  matrix: {
+    label: "🟢 Matrix",
+    values: { background: [4, 14, 6], color_on: [70, 255, 120], color_off: [70, 255, 120], off_opacity: 10, glow: true, glow_strength: 50 },
+  },
+  pink: {
+    label: "🩷 Pink",
+    values: { background: [225, 85, 145], color_on: [255, 255, 255], color_off: [0, 0, 0], off_opacity: 15, glow: true, glow_strength: 30 },
+  },
+  ha: {
+    label: "🏠 Home-Assistant-Theme",
+    values: {
+      background: "var(--ha-card-background, var(--card-background-color))",
+      color_on: "var(--primary-color)",
+      color_off: "var(--primary-text-color)",
+      off_opacity: 12,
+      glow: true,
+      glow_strength: 30,
+    },
+  },
+};
+const THEME_KEYS = ["background", "color_on", "color_off", "off_opacity", "glow", "glow_strength"];
+
+/** Konfiguration mit Standardwerten und Farb-Vorlage zusammenführen. */
+function withTheme(config) {
+  const theme = THEMES[(config && config.theme) || DEFAULTS.theme];
+  return { ...DEFAULTS, ...(theme ? theme.values : {}), ...(config || {}) };
+}
 
 // Auswahl im Editor: Name -> CSS font-family
 const FONT_STACKS = {
@@ -241,7 +309,7 @@ class ClockInLettersCard extends HTMLElement {
   }
 
   setConfig(config) {
-    this._config = { ...DEFAULTS, ...(config || {}) };
+    this._config = withTheme(config);
     this._built = false;
     if (this.isConnected) this._render();
   }
@@ -409,9 +477,19 @@ class ClockInLettersCardEditor extends HTMLElement {
       this._form = document.createElement("ha-form");
       this._form.computeLabel = (s) => s.title || LABELS[s.name] || s.name;
       this._form.addEventListener("value-changed", (ev) => {
+        const config = { ...ev.detail.value };
+        const prevTheme = (this._config && this._config.theme) || DEFAULTS.theme;
+        const theme = THEMES[config.theme];
+        if (config.theme !== prevTheme && theme) {
+          // Neue Vorlage gewählt: deren Farben übernehmen
+          Object.assign(config, theme.values);
+        } else if (theme && THEME_KEYS.some((k) => !sameValue(config[k], theme.values[k]))) {
+          // Farbe von Hand geändert: Vorlage auf "Eigene Farben" stellen
+          config.theme = "eigene";
+        }
         this.dispatchEvent(
           new CustomEvent("config-changed", {
-            detail: { config: ev.detail.value },
+            detail: { config },
             bubbles: true,
             composed: true,
           })
@@ -421,14 +499,19 @@ class ClockInLettersCardEditor extends HTMLElement {
     }
     this._form.hass = this._hass;
     this._form.schema = SCHEMA;
-    const data = { ...DEFAULTS, ...this._config };
+    const data = withTheme(this._config);
     for (const key of ["color_on", "color_off", "background"]) data[key] = toRgb(data[key]);
     if (typeof data.padding === "string") data.padding = parseFloat(data.padding) || DEFAULTS.padding;
     this._form.data = data;
   }
 }
 
+function sameValue(a, b) {
+  return JSON.stringify(toRgb(a)) === JSON.stringify(toRgb(b));
+}
+
 const LABELS = {
+  theme: "Farb-Vorlage",
   font_family: "Schriftart",
   font_size: "Schriftgröße (%)",
   font_weight: "Schriftstärke",
@@ -451,6 +534,18 @@ const slider = (min, max, step = 1) => ({
 });
 
 const SCHEMA = [
+  {
+    name: "theme",
+    selector: {
+      select: {
+        mode: "dropdown",
+        options: [
+          ...Object.entries(THEMES).map(([value, t]) => ({ value, label: t.label })),
+          { value: "eigene", label: "🎨 Eigene Farben" },
+        ],
+      },
+    },
+  },
   {
     type: "expandable",
     name: "schrift",
@@ -583,4 +678,4 @@ console.info(
   "color: #fff; background: #111;"
 );
 
-if (typeof module !== "undefined") module.exports = { computeWords, wordsToText, toCss, toRgb, resolveFont };
+if (typeof module !== "undefined") module.exports = { computeWords, wordsToText, toCss, toRgb, resolveFont, withTheme, THEMES };

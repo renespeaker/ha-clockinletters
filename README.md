@@ -31,6 +31,8 @@ Im Dashboard **Karte hinzufügen → „Clock in Letters“** auswählen. Der
 Karten-Editor hat aufklappbare Menüs, in denen du alles einstellen kannst:
 
 - **Schrift** – Schriftart (Auswahlliste oder eigener Name), Schriftgröße, Schriftstärke
+- **Farb-Vorlage** – Schwarz, Weiß, Messing, Gold auf Schwarz, Kupfer, Edelstahl,
+  Walnuss, Rot, Nachtblau, Matrix, Pink oder die Farben deines Home-Assistant-Themes
 - **Farben** – Farbwähler für aktive und inaktive Buchstaben und den Hintergrund,
   Deckkraft der inaktiven Buchstaben, Leucht-Effekt und dessen Stärke
 - **Anzeige** – Minuten-Punkte, „ES IST“, abgerundete Ecken, Innenabstand
@@ -56,10 +58,20 @@ background: [10, 25, 45]
 glow_strength: 60
 ```
 
+## Farb-Vorlagen
+
+![Farb-Vorlagen](themes.png)
+
+```yaml
+type: custom:clockinletters-card
+theme: kupfer
+```
+
 ## Optionen
 
 | Option          | Standard          | Beschreibung |
 |-----------------|-------------------|--------------|
+| `theme`         | `schwarz`         | Farb-Vorlage: `schwarz`, `weiss`, `messing`, `gold`, `kupfer`, `edelstahl`, `walnuss`, `rot`, `nachtblau`, `matrix`, `pink`, `ha` (Farben des HA-Themes) oder `eigene`. Einzeln gesetzte Farben überschreiben die Vorlage. |
 | `font_family`   | `Helvetica Neue`  | Schriftart: `Helvetica Neue`, `Roboto`, `Arial`, `Verdana`, `Trebuchet MS`, `Georgia`, `Times New Roman`, `Courier New` oder eine Google-Schrift (`Josefin Sans`, `Montserrat`, `Raleway`, `Poppins`, `Oswald`, `Quicksand`, `Comfortaa`, `Orbitron`, `Playfair Display`, `Roboto Mono`). Auch jeder andere CSS-Schriftname ist möglich. |
 | `font_size`     | `100`             | Schriftgröße in % (50–130) |
 | `font_weight`   | `"300"`           | Schriftstärke `"100"` (hauchdünn) bis `"900"` (extra fett) |
