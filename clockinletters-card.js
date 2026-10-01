@@ -5,7 +5,7 @@
  * plus vier Eck-Punkte für die Minuten zwischen den 5-Minuten-Schritten.
  */
 
-const CARD_VERSION = "1.5.0";
+const CARD_VERSION = "1.5.1";
 
 const GRID = [
   "ESKISTAFÜNF",
@@ -181,21 +181,21 @@ const FINISHES = {
   flach: "",
   glanz: "",
   matt: `background-image: ${noise("1.2", 2, 0.55, 200)}, ${noise("0.01", 3, 0.35, 500)};
-    background-size: 60cqi 60cqi, 150cqi 150cqi;
+    background-size: calc(60 * var(--u, 1cqi)) calc(60 * var(--u, 1cqi)), calc(150 * var(--u, 1cqi)) calc(150 * var(--u, 1cqi));
     background-blend-mode: soft-light, soft-light;`,
   gebuerstet: `
     background-image: linear-gradient(100deg, rgba(255,255,255,0.18), rgba(0,0,0,0.12) 35%, rgba(255,255,255,0.14) 60%, rgba(0,0,0,0.18)),
       ${noise("0.0015 0.9", 3, 0.6)};
-    background-size: 100% 100%, 120cqi 120cqi;
+    background-size: 100% 100%, calc(120 * var(--u, 1cqi)) calc(120 * var(--u, 1cqi));
     background-blend-mode: soft-light, overlay;`,
   holz: `
     background-image: ${noise("0.004 0.09", 4, 1, 500)}, ${noise("0.02 0.5", 2, 0.6, 300)};
-    background-size: 150cqi 150cqi, 90cqi 90cqi;
+    background-size: calc(150 * var(--u, 1cqi)) calc(150 * var(--u, 1cqi)), calc(90 * var(--u, 1cqi)) calc(90 * var(--u, 1cqi));
     background-blend-mode: overlay, soft-light;`,
   rost: `
     background-image: ${noise("0.012", 5, 1, 500)}, ${noise("0.09", 4, 0.8, 300)},
       radial-gradient(circle at 30% 25%, rgba(200, 110, 40, 0.5), transparent 60%);
-    background-size: 150cqi 150cqi, 90cqi 90cqi, 100% 100%;
+    background-size: calc(150 * var(--u, 1cqi)) calc(150 * var(--u, 1cqi)), calc(90 * var(--u, 1cqi)) calc(90 * var(--u, 1cqi)), 100% 100%;
     background-blend-mode: overlay, soft-light, normal;`,
 };
 
@@ -215,6 +215,10 @@ function resolveFinish(config) {
 }
 
 // Buchstaben mit geschlossenem Innenraum bekommen Stege
+function realisticOn(c) {
+  return c.realistic !== false;
+}
+
 const STENCIL_CHARS = ["O", "Ö", "Q", "D"];
 
 const THEME_KEYS = ["background", "color_on", "color_off", "off_opacity", "glow", "glow_strength"];
@@ -295,6 +299,12 @@ function toRgb(value) {
   if (m) return [+m[1], +m[2], +m[3]];
   return value;
 }
+
+/* Farben in JS mischen statt mit CSS color-mix() – das können ältere Browser
+   (z. B. Kiosk-Browser auf Wandmonitoren, Chrome < 111) nicht. */
+const rgb = (c) => `rgb(${c.map(Math.round).join(", ")})`;
+const rgba = (c, a) => `rgba(${c.map(Math.round).join(", ")}, ${a})`;
+const mixRgb = (a, b, t) => a.map((v, i) => v + (b[i] - v) * t);
 
 function clamp(n, min, max, fallback) {
   const x = Number(n);
@@ -487,6 +497,13 @@ class ClockInLettersCard extends HTMLElement {
 
   set hass(hass) {
     this._hass = hass;
+    // HA-Theme gewechselt (z. B. hell/dunkel): Farben neu auflösen
+    const key = hass && hass.themes ? `${hass.themes.theme}|${hass.themes.darkMode}` : "";
+    if (key !== this._themeKey) {
+      const changed = this._themeKey !== undefined;
+      this._themeKey = key;
+      if (changed && this.isConnected) this._render();
+    }
   }
 
   getCardSize() {
@@ -533,6 +550,10 @@ class ClockInLettersCard extends HTMLElement {
   disconnectedCallback() {
     clearTimeout(this._timer);
     this._timer = null;
+    if (this._ro) {
+      this._ro.disconnect();
+      this._ro = null;
+    }
     if (this._listening) {
       this._listening = false;
       this.removeEventListener("click", this._onClick);
@@ -609,8 +630,17 @@ class ClockInLettersCard extends HTMLElement {
     const on = toCss(c.color_on, DEFAULTS.color_on);
     const offBase = toCss(c.color_off, DEFAULTS.color_off);
     const offOpacity = clamp(c.off_opacity, 0, 100, DEFAULTS.off_opacity);
-    const off = `color-mix(in srgb, ${offBase} ${offOpacity}%, transparent)`;
     const bg = toCss(c.background, DEFAULTS.background);
+    // In echte RGB-Werte auflösen (auch var(--primary-color) & Co.)
+    const onRgb = this._resolveRgb(on);
+    const offRgb = this._resolveRgb(offBase);
+    const bgRgb = this._resolveRgb(bg);
+    const WHITE = [255, 255, 255];
+    const BLACK = [0, 0, 0];
+    const off = offRgb ? rgba(offRgb, offOpacity / 100) : `color-mix(in srgb, ${offBase} ${offOpacity}%, transparent)`;
+    const onLit = realisticOn(c) && onRgb ? rgb(mixRgb(onRgb, WHITE, 0.15)) : "var(--ct-on)";
+    const onSoft = (a) => (onRgb ? rgba(onRgb, a) : "var(--ct-on)");
+    const edge = (t, a) => (bgRgb ? rgb(mixRgb(bgRgb, BLACK, t)) : `rgba(0, 0, 0, ${a})`);
     const fontSize = (6 * clamp(c.font_size, 30, 150, 100)) / 100;
     const glow = c.glow ? clamp(c.glow_strength, 0, 100, DEFAULTS.glow_strength) / 100 : 0;
     const padding = typeof c.padding === "string" ? c.padding : `${clamp(c.padding, 0, 25, 8)}%`;
@@ -647,7 +677,7 @@ class ClockInLettersCard extends HTMLElement {
       ? ""
       : realistic
         ? `text-shadow: 0 0 ${0.06 + glow * 0.08}em var(--ct-on), 0 0 ${glow * 0.3}em var(--ct-on),
-             0 0 ${glow * 0.8}em color-mix(in srgb, var(--ct-on) 55%, transparent);`
+             0 0 ${glow * 0.8}em ${onSoft(0.55)};`
         : `text-shadow: 0 0 ${glow}em var(--ct-on);`;
 
     this.shadowRoot.innerHTML = `
@@ -671,7 +701,12 @@ class ClockInLettersCard extends HTMLElement {
           margin: 0 auto;
           ${view3d ? "perspective: 1400px;" : ""}
           /* Nie höher als der sichtbare Bildschirm (Kopfzeile von HA abgezogen) */
-          ${fit ? "max-width: calc(100dvh - var(--header-height, 56px) - 16px);" : ""}
+          ${
+            fit
+              ? `max-width: calc(100vh - var(--header-height, 56px) - 24px);
+                 max-width: calc(100dvh - var(--header-height, 56px) - 24px);`
+              : ""
+          }
         }
         ${
           fit && !framed
@@ -695,6 +730,7 @@ class ClockInLettersCard extends HTMLElement {
           inset: 0;
           z-index: 10000;
           width: 100vw;
+          height: 100vh;
           height: 100dvh;
           background: ${fsBg};
           display: flex;
@@ -710,13 +746,14 @@ class ClockInLettersCard extends HTMLElement {
           overflow: visible;
         }
         :host(.fs) .wrap {
+          width: min(94vw, 94vh);
           width: min(94vw, 94dvh);
           max-width: none;
           padding: ${framed ? "4%" : "0"};
         }
         :host(.fs) .face {
-          border-radius: 0.4cqi;
-          ${framed ? "" : "box-shadow: 0 0 6cqi rgba(0, 0, 0, 0.5);"}
+          border-radius: calc(0.4 * var(--u, 1cqi));
+          ${framed ? "" : "box-shadow: 0 0 calc(6 * var(--u, 1cqi)) rgba(0, 0, 0, 0.5);"}
         }
         .face {
           position: relative;
@@ -730,14 +767,14 @@ class ClockInLettersCard extends HTMLElement {
             view3d
               ? `transform: rotateY(-16deg) rotateX(3deg) scale(0.94);
                  transform-origin: 60% 50%;
-                 border-radius: 0.3cqi;
-                 box-shadow: -0.4cqi 0 0 color-mix(in srgb, var(--ct-bg) 45%, black),
-                   -0.8cqi 0.1cqi 0 color-mix(in srgb, var(--ct-bg) 35%, black),
-                   -1.2cqi 0.2cqi 0 color-mix(in srgb, var(--ct-bg) 25%, black),
-                   -3cqi 3cqi 6cqi rgba(0, 0, 0, 0.45);`
+                 border-radius: calc(0.3 * var(--u, 1cqi));
+                 box-shadow: calc(-0.4 * var(--u, 1cqi)) 0 0 ${edge(0.55, 0.55)},
+                   calc(-0.8 * var(--u, 1cqi)) calc(0.1 * var(--u, 1cqi)) 0 ${edge(0.65, 0.65)},
+                   calc(-1.2 * var(--u, 1cqi)) calc(0.2 * var(--u, 1cqi)) 0 ${edge(0.75, 0.75)},
+                   calc(-3 * var(--u, 1cqi)) calc(3 * var(--u, 1cqi)) calc(6 * var(--u, 1cqi)) rgba(0, 0, 0, 0.45);`
               : wall
-                ? `border-radius: 0.4cqi;
-                 box-shadow: 0 0.6cqi 1.2cqi rgba(0, 0, 0, 0.35), 0 3cqi 6cqi rgba(0, 0, 0, 0.35);`
+                ? `border-radius: calc(0.4 * var(--u, 1cqi));
+                 box-shadow: 0 calc(0.6 * var(--u, 1cqi)) calc(1.2 * var(--u, 1cqi)) rgba(0, 0, 0, 0.35), 0 calc(3 * var(--u, 1cqi)) calc(6 * var(--u, 1cqi)) rgba(0, 0, 0, 0.35);`
                 : ""
           }
         }
@@ -752,8 +789,8 @@ class ClockInLettersCard extends HTMLElement {
           border-radius: inherit;
           pointer-events: none;
           z-index: 2;
-          box-shadow: inset 0 0.25cqi 0 rgba(255, 255, 255, 0.14), inset 0 -0.35cqi 0.6cqi rgba(0, 0, 0, 0.3),
-            inset 0 0 8cqi rgba(0, 0, 0, 0.18);
+          box-shadow: inset 0 calc(0.25 * var(--u, 1cqi)) 0 rgba(255, 255, 255, 0.14), inset 0 calc(-0.35 * var(--u, 1cqi)) calc(0.6 * var(--u, 1cqi)) rgba(0, 0, 0, 0.3),
+            inset 0 0 calc(8 * var(--u, 1cqi)) rgba(0, 0, 0, 0.18);
           background: ${SHEENS[finish] || "none"};
         }`
             : ""
@@ -767,7 +804,7 @@ class ClockInLettersCard extends HTMLElement {
           justify-content: space-between;
           font-family: ${resolveFont(c.font_family)};
           font-weight: ${c.font_weight || DEFAULTS.font_weight};
-          font-size: ${fontSize}cqi;
+          font-size: calc(${fontSize} * var(--u, 1cqi));
           line-height: 1;
           user-select: none;
         }
@@ -784,7 +821,7 @@ class ClockInLettersCard extends HTMLElement {
           ${realistic ? "text-shadow: -0.03em -0.03em 0 rgba(0, 0, 0, 0.3), 0.02em 0.02em 0 rgba(255, 255, 255, 0.06);" : ""}
         }
         .l.on {
-          color: ${realistic ? "color-mix(in srgb, var(--ct-on) 85%, white)" : "var(--ct-on)"};
+          color: ${onLit};
           ${realistic ? "-webkit-text-stroke: 0.035em currentColor;" : ""}
           ${letterGlow}
         }
@@ -818,7 +855,7 @@ class ClockInLettersCard extends HTMLElement {
           height: 2.2em;
           transform: translate(-50%, -50%);
           border-radius: 50%;
-          background: radial-gradient(closest-side, color-mix(in srgb, var(--ct-on) 45%, transparent), transparent);
+          background: radial-gradient(closest-side, ${onSoft(0.45)}, ${onSoft(0)});
           opacity: 0;
           z-index: -1;
           transition: opacity 1s ease;
@@ -832,21 +869,21 @@ class ClockInLettersCard extends HTMLElement {
         .dot {
           position: absolute;
           z-index: 1;
-          width: 1.4cqi;
-          height: 1.4cqi;
+          width: calc(1.4 * var(--u, 1cqi));
+          height: calc(1.4 * var(--u, 1cqi));
           border-radius: 50%;
           background: var(--ct-off);
           transition: background 1s ease, box-shadow 1s ease;
-          ${realistic ? "box-shadow: inset 0 0.2cqi 0.3cqi rgba(0, 0, 0, 0.5), 0 0.1cqi 0 rgba(255, 255, 255, 0.1);" : ""}
+          ${realistic ? "box-shadow: inset 0 calc(0.2 * var(--u, 1cqi)) calc(0.3 * var(--u, 1cqi)) rgba(0, 0, 0, 0.5), 0 calc(0.1 * var(--u, 1cqi)) 0 rgba(255, 255, 255, 0.1);" : ""}
         }
         .dot.on {
-          background: ${realistic ? "color-mix(in srgb, var(--ct-on) 85%, white)" : "var(--ct-on)"};
-          ${glow ? `box-shadow: 0 0 ${glow * 1.5}cqi var(--ct-on), 0 0 ${glow * 4}cqi var(--ct-on);` : ""}
+          background: ${onLit};
+          calc(${glow ? `box-shadow: 0 0 ${glow * 1.5} * var(--u, 1cqi)) var(--ct-on), 0 0 calc(${glow * 4} * var(--u, 1cqi)) var(--ct-on);` : ""}
         }
-        .d1 { top: 3.3cqi; left: 3.3cqi; }
-        .d2 { top: 3.3cqi; right: 3.3cqi; }
-        .d3 { bottom: 3.3cqi; right: 3.3cqi; }
-        .d4 { bottom: 3.3cqi; left: 3.3cqi; }
+        .d1 { top: calc(3.3 * var(--u, 1cqi)); left: calc(3.3 * var(--u, 1cqi)); }
+        .d2 { top: calc(3.3 * var(--u, 1cqi)); right: calc(3.3 * var(--u, 1cqi)); }
+        .d3 { bottom: calc(3.3 * var(--u, 1cqi)); right: calc(3.3 * var(--u, 1cqi)); }
+        .d4 { bottom: calc(3.3 * var(--u, 1cqi)); left: calc(3.3 * var(--u, 1cqi)); }
       </style>
       <ha-card>
         <div class="wrap">
@@ -861,8 +898,38 @@ class ClockInLettersCard extends HTMLElement {
     this._layout = layout;
     this._dots = [...this.shadowRoot.querySelectorAll(".dot")];
     this._face = this.shadowRoot.querySelector(".face");
+    this._observeSize();
     this._built = true;
     this._update();
+  }
+
+  /** --u = 1 % der Uhrbreite in px; alle Größen hängen daran (ohne Container-Queries). */
+  _observeSize() {
+    const face = this._face;
+    const apply = (w) => {
+      if (w > 0) face.style.setProperty("--u", `${w / 100}px`);
+    };
+    apply(face.offsetWidth);
+    if (this._ro) this._ro.disconnect();
+    if (window.ResizeObserver) {
+      this._ro = new ResizeObserver((entries) => apply(entries[0].contentRect.width));
+      this._ro.observe(face);
+    }
+  }
+
+  /** Beliebige CSS-Farbe (auch var(--…)) in [r, g, b] auflösen, sonst null. */
+  _resolveRgb(value) {
+    const direct = toRgb(value);
+    if (Array.isArray(direct)) return direct;
+    if (!this.shadowRoot) return null;
+    const probe = document.createElement("span");
+    probe.style.color = "rgb(1, 2, 3)";
+    probe.style.color = value;
+    this.shadowRoot.appendChild(probe);
+    const computed = getComputedStyle(probe).color;
+    probe.remove();
+    const parsed = toRgb(computed);
+    return Array.isArray(parsed) ? parsed : null;
   }
 
   _update() {
