@@ -1,0 +1,49 @@
+name: Release
+
+# Neues Release: Version in clockinletters-card.js (CARD_VERSION) erhöhen,
+# CHANGELOG.md ergänzen, committen, dann Tag pushen:
+#   git tag v1.6.0 && git push origin v1.6.0
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Version im Code muss zum Tag passen
+        run: |
+          TAG="${GITHUB_REF_NAME#v}"
+          CODE=$(grep -oP 'const CARD_VERSION = "\K[^"]+' clockinletters-card.js)
+          echo "Tag: $TAG  Code: $CODE"
+          test "$TAG" = "$CODE"
+
+      - name: Prüfen
+        run: |
+          node --check clockinletters-card.js
+          node tests/time.test.js
+
+      - name: Release-Notizen aus CHANGELOG.md
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          awk -v v="$VERSION" '
+            $0 ~ "^## \\[?" v "\\]?" {found=1; next}
+            found && /^## / {exit}
+            found {print}
+          ' CHANGELOG.md > notes.md
+          test -s notes.md || echo "Version $VERSION" > notes.md
+          cat notes.md
+
+      - uses: softprops/action-gh-release@v2
+        with:
+          body_path: notes.md
+          files: clockinletters-card.js

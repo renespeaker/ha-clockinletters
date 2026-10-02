@@ -4,7 +4,7 @@ Eine Lovelace-Karte als Wortuhr: Die Uhrzeit wird in leuchtenden
 deutschen oder englischen Wörtern in einem 11×10-Buchstabenraster angezeigt. Vier Punkte in den
 Ecken zeigen die Minuten zwischen den 5-Minuten-Schritten an.
 
-![Screenshot](screenshot.png)
+![Screenshot](images/screenshot.png)
 
 *(Oliv auf Englisch an der Wand, Walnuss auf Deutsch und Kupfer in 3D-Ansicht)*
 
@@ -89,7 +89,7 @@ views:
 
 ## Farb-Vorlagen
 
-![Farb-Vorlagen](themes.png)
+![Farb-Vorlagen](images/themes.png)
 
 ```yaml
 type: custom:clockinletters-card
@@ -130,6 +130,24 @@ wall_mount: true
 
 Google-Schriften werden beim ersten Anzeigen aus dem Internet geladen.
 Ohne Internetzugang wird eine Ersatzschrift verwendet.
+
+## Updates
+
+Neue Versionen erscheinen als [Releases](https://github.com/renespeaker/ha-clockinletters/releases)
+und werden in HACS als Update angezeigt. Was sich geändert hat, steht in der
+[CHANGELOG.md](CHANGELOG.md). Nach einem Update den Browser-Cache leeren.
+
+### Neue Version veröffentlichen (für Entwickler)
+
+1. `CARD_VERSION` in `clockinletters-card.js` erhöhen, z. B. auf `1.6.0`
+2. Eintrag in `CHANGELOG.md` ergänzen und alles auf `main` pushen
+3. Tag pushen – GitHub erstellt das Release mit der Karten-Datei automatisch:
+   ```bash
+   git tag v1.6.0
+   git push origin v1.6.0
+   ```
+
+Tests lokal ausführen: `node tests/time.test.js`
 
 ## Vorschau ohne Home Assistant
 
