@@ -2,6 +2,11 @@
 
 Alle Versionen der Karte „Clock in Letters“. Die neueste steht oben.
 
+## [1.5.2] – 2026-10-02
+
+- Versionen erscheinen jetzt als Releases und werden in HACS als Update angezeigt
+- HACS-Beschreibung korrigiert (hacs.json, Bilder in der Beschreibung)
+
 ## [1.5.1] – 2026-10-01
 
 - Läuft jetzt auch in älteren Browsern (Kiosk-Browser, Wandmonitore):
