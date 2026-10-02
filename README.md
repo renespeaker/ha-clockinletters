@@ -146,14 +146,15 @@ Im Menü **Grüße & Nachrichten** (standardmäßig aus) lassen sich Grußzeilen
 wahlweise **oben, unten, links oder rechts** neben der Uhr:
 
 - **Guten Morgen** – standardmäßig 5–10 Uhr
+- **Guten Mittag** – 11:30–14 Uhr
 - **Guten Abend** – 18–22 Uhr
 - **Gute Nacht** – 22–5 Uhr
 
 Die Uhrzeiten sind einstellbar. Die Grüße gibt es in allen Sprachen der Uhr
-(Good morning, Goedemorgen, Bonjour, Buenos días …).
+(Good morning, Good afternoon, Goedemiddag, Bonjour, Buenos días …).
 
 Statt nach Uhrzeit kann auch eine **Entität** den Gruß bestimmen – z. B. ein
-`input_select` mit den Optionen „Morgen“, „Abend“, „Nacht“, „Aus“. So lässt sich der Gruß
+`input_select` mit den Optionen „Morgen“, „Mittag“, „Abend“, „Nacht“, „Aus“. So lässt sich der Gruß
 per Automation steuern (z. B. „Guten Morgen“ erst, wenn jemand aufgestanden ist).
 
 ```yaml
@@ -161,6 +162,33 @@ type: custom:clockinletters-card
 greeting: true
 greeting_position: bottom          # top, bottom, left, right
 greeting_entity: input_select.uhr_gruss   # optional
+```
+
+### Anlässe
+
+Im Menü **Anlässe** (standardmäßig aus) erscheinen besondere Grüße groß im Stil der Uhr –
+in der gewählten Sprache:
+
+| Anlass | Wann |
+|---|---|
+| Frohe Ostern | Ostersonntag und -montag (Datum wird jedes Jahr berechnet) |
+| Frohe Weihnachten | 24.–26. Dezember |
+| Frohes neues Jahr | Silvester ab 18 Uhr und Neujahr |
+| Happy Birthday + Name | an den eingetragenen Geburtstagen |
+| Herzlichen Glückwunsch | solange die Glückwunsch-Entität an ist (z. B. `input_boolean`) |
+
+Wie oft und wie lange der Gruß erscheint, stellst du selbst ein – z. B. alle 15 Minuten
+für 30 Sekunden, jede Minute für 10 Sekunden, oder dauerhaft statt der Uhr.
+
+```yaml
+type: custom:clockinletters-card
+occasions: true
+birthdays: "15.03. Anna, 02.11. Max"
+congrats_entity: input_boolean.glueckwunsch
+occasion_display: interval   # oder permanent
+occasion_interval: 15        # alle 15 Minuten …
+occasion_duration: 30        # … für 30 Sekunden
+occasion_color: RAL 3020     # optional, z. B. Rot
 ```
 
 ### Nachrichten
@@ -280,8 +308,17 @@ wall_mount: true
 | `greeting_position` | `bottom`      | `top`, `bottom`, `left`, `right` |
 | `greeting_entity` | –               | Entität bestimmt den Gruß (Zustand „Morgen“, „Abend“, „Nacht“, sonst keiner) |
 | `greeting_morning_start` / `_end` | `05:00` / `10:00` | Zeitraum „Guten Morgen“ |
+| `greeting_noon_start` / `_end` | `11:30` / `14:00` | Zeitraum „Guten Mittag“ |
 | `greeting_evening_start` | `18:00`  | Ab wann „Guten Abend“ |
 | `greeting_night_start` | `22:00`    | Ab wann „Gute Nacht“ (bis Morgen-Beginn) |
+| `occasions`     | `false`           | Anlässe anzeigen |
+| `occasion_easter` / `_christmas` / `_newyear` | `true` | Einzelne Anlässe an/aus |
+| `birthdays`     | –                 | Geburtstage, z. B. `"15.03. Anna, 02.11. Max"` |
+| `congrats_entity` | –               | Entität für „Herzlichen Glückwunsch“ (an = anzeigen) |
+| `occasion_display` | `interval`     | `interval` (regelmäßig) oder `permanent` (statt der Uhr) |
+| `occasion_interval` | `15`          | Alle x Minuten einblenden |
+| `occasion_duration` | `30`          | Für x Sekunden |
+| `occasion_color` | –                | Eigene Farbe für Anlässe (Hex, RGB, RAL) |
 | `message_entity` | –                | Entität, deren Text als Nachricht erscheint (z. B. `input_text`) |
 | `message_duration` | `30`           | Sekunden; `0` = solange die Entität Text hat |
 | `custom_size`   | `false`           | Breite und Höhe frei einstellen |

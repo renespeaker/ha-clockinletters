@@ -8,7 +8,7 @@ global.window = {};
 global.document = { getElementById: () => null };
 console.info = () => {};
 
-const { GREETINGS, greetingFromState, greetingForMinute, parseColorCode, normalizeColorCode, colorCodeOf, RAL_CLASSIC, computeWords, wordsToText, GRID_EN, LAYOUTS, wallClock, parseTime, inTimeWindow, hsToRgb, isActive } = require("../clockinletters-card.js");
+const { easterSunday, parseBirthdays, occasionFor, wallDate, GREETINGS, greetingFromState, greetingForMinute, parseColorCode, normalizeColorCode, colorCodeOf, RAL_CLASSIC, computeWords, wordsToText, GRID_EN, LAYOUTS, wallClock, parseTime, inTimeWindow, hsToRgb, isActive } = require("../clockinletters-card.js");
 
 const de = (h, m, cfg = {}) =>
   wordsToText(computeWords(new Date(2026, 0, 1, h, m), { show_es_ist: true, dialect: "west", zwanzig: "zwanzig", ...cfg }).words);
@@ -172,11 +172,11 @@ assert.strictEqual(colorCodeOf("RAL 6003"), "RAL 6003");
 
 // Grußzeilen: Wörter liegen richtig, alle Zeilen gleich lang
 const expectGreet = {
-  de: { morning: "GUTEN MORGEN", evening: "GUTEN ABEND", night: "GUTE NACHT" },
-  en: { morning: "GOOD MORNING", evening: "GOOD EVENING", night: "GOOD NIGHT" },
-  nl: { morning: "GOEDE MORGEN", evening: "GOEDE AVOND", night: "GOEDE NACHT" },
-  fr: { morning: "BONJOUR", evening: "BON SOIR", night: "BONNE NUIT" },
-  es: { morning: "BUENOS DÍAS", evening: "BUENAS TARDES", night: "BUENAS NOCHES" },
+  de: { morning: "GUTEN MORGEN", noon: "GUTEN MITTAG", evening: "GUTEN ABEND", night: "GUTE NACHT" },
+  en: { morning: "GOOD MORNING", noon: "GOOD AFTERNOON", evening: "GOOD EVENING", night: "GOOD NIGHT" },
+  nl: { morning: "GOEDE MORGEN", noon: "GOEDE MIDDAG", evening: "GOEDE AVOND", night: "GOEDE NACHT" },
+  fr: { morning: "BONJOUR", noon: "BONJOUR", evening: "BON SOIR", night: "BONNE NUIT" },
+  es: { morning: "BUENOS DÍAS", noon: "BUENAS TARDES", evening: "BUENAS TARDES", night: "BUENAS NOCHES" },
 };
 for (const [lang, g] of Object.entries(GREETINGS)) {
   for (const orient of ["h", "v"]) {
@@ -184,24 +184,60 @@ for (const [lang, g] of Object.entries(GREETINGS)) {
     const width = [...def.rows[0]].length;
     if (orient === "h") assert.strictEqual(width, 11, `${lang} h`);
     for (const row of def.rows) assert.strictEqual([...row].length, width, `${lang} ${orient}: ${row}`);
-    for (const key of ["morning", "evening", "night"]) {
+    for (const key of ["morning", "noon", "evening", "night"]) {
       const text = def[key].map(([r, c, l]) => [...def.rows[r]].slice(c, c + l).join("")).join(" ");
       assert.strictEqual(text.replace(/ /g, ""), expectGreet[lang][key].replace(/ /g, ""), `${lang} ${orient} ${key}`);
     }
   }
 }
-const gcfg = { greeting_morning_start: "05:00", greeting_morning_end: "10:00", greeting_evening_start: "18:00", greeting_night_start: "22:00" };
+const gcfg = { greeting_morning_start: "05:00", greeting_morning_end: "10:00", greeting_noon_start: "11:30", greeting_noon_end: "14:00", greeting_evening_start: "18:00", greeting_night_start: "22:00" };
 const g = (hhmm) => greetingForMinute(parseTime(hhmm), gcfg);
 assert.strictEqual(g("04:59"), "night");
 assert.strictEqual(g("05:00"), "morning");
 assert.strictEqual(g("09:59"), "morning");
 assert.strictEqual(g("10:00"), null);
+assert.strictEqual(g("11:29"), null);
+assert.strictEqual(g("11:30"), "noon");
+assert.strictEqual(g("13:59"), "noon");
+assert.strictEqual(g("14:00"), null);
 assert.strictEqual(g("17:59"), null);
 assert.strictEqual(g("18:00"), "evening");
 assert.strictEqual(g("22:00"), "night");
 assert.strictEqual(g("00:30"), "night");
-for (const [state, key] of [["Morgen", "morning"], ["Guten Abend", "evening"], ["nacht", "night"], ["night", "night"], ["Aus", null], ["off", null], ["", null]]) {
+for (const [state, key] of [["Guten Mittag", "noon"], ["Morgen", "morning"], ["Guten Abend", "evening"], ["nacht", "night"], ["night", "night"], ["Aus", null], ["off", null], ["", null]]) {
   assert.strictEqual(greetingFromState(state), key, state);
 }
 
-console.log(`OK – ${cases.length} Uhrzeiten, alle 1440 Minuten, Zeitzonen, Nachtfenster, Farbcodes und Grüße geprüft`);
+// Anlässe
+for (const [y, m, d] of [[2024, 3, 31], [2025, 4, 20], [2026, 4, 5], [2027, 3, 28], [2030, 4, 21], [2038, 4, 25]]) {
+  assert.deepStrictEqual(easterSunday(y), { m, d }, `Ostern ${y}`);
+}
+assert.deepStrictEqual(parseBirthdays("15.03. Anna, 02.11 Max; 24.12.1990 Oma\n1.1. "), [
+  { d: 15, m: 3, name: "Anna" },
+  { d: 2, m: 11, name: "Max" },
+  { d: 24, m: 12, name: "Oma" },
+  { d: 1, m: 1, name: "" },
+]);
+const occ = (y, mo, d, h, extra = {}, congrats = false) => {
+  const r = occasionFor({ y, mo, d, h }, { language: "de", ...extra }, congrats);
+  return r ? r.text + (r.sub ? ` ${r.sub}` : "") : null;
+};
+assert.strictEqual(occ(2026, 4, 5, 10), "Frohe Ostern");
+assert.strictEqual(occ(2026, 4, 6, 10), "Frohe Ostern"); // Ostermontag
+assert.strictEqual(occ(2026, 4, 7, 10), null);
+assert.strictEqual(occ(2026, 12, 23, 20), null);
+assert.strictEqual(occ(2026, 12, 24, 20), "Frohe Weihnachten");
+assert.strictEqual(occ(2026, 12, 26, 9), "Frohe Weihnachten");
+assert.strictEqual(occ(2026, 12, 31, 17), null);
+assert.strictEqual(occ(2026, 12, 31, 18), "Frohes neues Jahr");
+assert.strictEqual(occ(2027, 1, 1, 12), "Frohes neues Jahr");
+assert.strictEqual(occ(2027, 1, 2, 12), null);
+assert.strictEqual(occ(2026, 12, 24, 20, { occasion_christmas: false }), null);
+assert.strictEqual(occ(2026, 3, 15, 8, { birthdays: "15.03. Anna" }), "Happy Birthday Anna");
+assert.strictEqual(occ(2026, 12, 25, 8, { birthdays: "25.12. Jesus" }), "Happy Birthday Jesus"); // Geburtstag vor Weihnachten
+assert.strictEqual(occ(2026, 7, 1, 8, {}, true), "Herzlichen Glückwunsch");
+assert.strictEqual(occasionFor({ y: 2026, mo: 12, d: 31, h: 23 }, { language: "en" }, false).text, "Happy New Year");
+assert.strictEqual(occasionFor({ y: 2026, mo: 12, d: 25, h: 9 }, { language: "fr" }, false).text, "Joyeux Noël");
+assert.deepStrictEqual(wallDate(new Date(Date.UTC(2026, 11, 31, 23, 30)), "Europe/Berlin"), { y: 2027, mo: 1, d: 1, h: 0 });
+
+console.log(`OK – ${cases.length} Uhrzeiten, alle 1440 Minuten, Zeitzonen, Nachtfenster, Farbcodes, Grüße und Anlässe geprüft`);

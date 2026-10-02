@@ -5,7 +5,7 @@
  * plus vier Eck-Punkte für die Minuten zwischen den 5-Minuten-Schritten.
  */
 
-const CARD_VERSION = "1.11.0";
+const CARD_VERSION = "1.12.0";
 
 const GRID = [
   "ESKISTAFÜNF",
@@ -86,8 +86,21 @@ const DEFAULTS = {
   greeting_entity: "", // optional: Entität bestimmt den Gruß (Zustand "Morgen", "Abend", "Nacht", sonst keiner)
   greeting_morning_start: "05:00",
   greeting_morning_end: "10:00",
+  greeting_noon_start: "11:30",
+  greeting_noon_end: "14:00",
   greeting_evening_start: "18:00",
   greeting_night_start: "22:00",
+  // Anlässe (Ostern, Weihnachten, Neujahr, Geburtstage, Glückwunsch) – groß im Stil der Uhr
+  occasions: false,
+  occasion_easter: true,
+  occasion_christmas: true,
+  occasion_newyear: true,
+  birthdays: "", // z. B. "15.03. Anna, 02.11. Max"
+  congrats_entity: "", // ist sie aktiv (an / hat Text): "Herzlichen Glückwunsch"
+  occasion_display: "interval", // interval: regelmäßig einblenden – permanent: dauerhaft statt der Uhr
+  occasion_interval: 15, // alle x Minuten
+  occasion_duration: 30, // für x Sekunden
+  occasion_color: "", // leer = Farbe der leuchtenden Buchstaben
   message_entity: "", // z. B. input_text.uhr_nachricht – ihr Text erscheint auf der Uhr
   message_duration: 30, // Sekunden; 0 = solange die Entität Text hat
   // Größe & Position
@@ -705,30 +718,57 @@ function computeWordsEs(date, cfg) {
 // Wörter je Gruß als [Zeile, Spalte, Länge].
 const GREETINGS = {
   de: {
-    h: { rows: ["GUTENMORGEN", "ABENDXNACHT"], morning: [[0, 0, 5], [0, 5, 6]], evening: [[0, 0, 5], [1, 0, 5]], night: [[0, 0, 4], [1, 6, 5]] },
-    v: { rows: ["GUTENK", "MORGEN", "ABENDL", "NACHTU"], morning: [[0, 0, 5], [1, 0, 6]], evening: [[0, 0, 5], [2, 0, 5]], night: [[0, 0, 4], [3, 0, 5]] },
+    h: {
+      rows: ["GUTENMORGEN", "MITTAGABEND", "NACHTSCHLAF"],
+      morning: [[0, 0, 5], [0, 5, 6]], noon: [[0, 0, 5], [1, 0, 6]], evening: [[0, 0, 5], [1, 6, 5]], night: [[0, 0, 4], [2, 0, 5]],
+    },
+    v: {
+      rows: ["GUTENK", "MORGEN", "MITTAG", "ABENDL", "NACHTU"],
+      morning: [[0, 0, 5], [1, 0, 6]], noon: [[0, 0, 5], [2, 0, 6]], evening: [[0, 0, 5], [3, 0, 5]], night: [[0, 0, 4], [4, 0, 5]],
+    },
   },
   en: {
-    h: { rows: ["GOODMORNING", "EVENINGTIME", "NIGHTSLEEPS"], morning: [[0, 0, 4], [0, 4, 7]], evening: [[0, 0, 4], [1, 0, 7]], night: [[0, 0, 4], [2, 0, 5]] },
-    v: { rows: ["GOODXAM", "MORNING", "EVENING", "NIGHTPM"], morning: [[0, 0, 4], [1, 0, 7]], evening: [[0, 0, 4], [2, 0, 7]], night: [[0, 0, 4], [3, 0, 5]] },
+    h: {
+      rows: ["GOODMORNING", "AFTERNOONXY", "EVENINGTIME", "NIGHTSLEEPS"],
+      morning: [[0, 0, 4], [0, 4, 7]], noon: [[0, 0, 4], [1, 0, 9]], evening: [[0, 0, 4], [2, 0, 7]], night: [[0, 0, 4], [3, 0, 5]],
+    },
+    v: {
+      rows: ["GOODXAMPM", "MORNINGXY", "AFTERNOON", "EVENINGZT", "NIGHTSLEP"],
+      morning: [[0, 0, 4], [1, 0, 7]], noon: [[0, 0, 4], [2, 0, 9]], evening: [[0, 0, 4], [3, 0, 7]], night: [[0, 0, 4], [4, 0, 5]],
+    },
   },
   nl: {
-    h: { rows: ["GOEDEMORGEN", "AVONDXNACHT"], morning: [[0, 0, 5], [0, 5, 6]], evening: [[0, 0, 5], [1, 0, 5]], night: [[0, 0, 5], [1, 6, 5]] },
-    v: { rows: ["GOEDEX", "MORGEN", "AVONDZ", "NACHTS"], morning: [[0, 0, 5], [1, 0, 6]], evening: [[0, 0, 5], [2, 0, 5]], night: [[0, 0, 5], [3, 0, 5]] },
+    h: {
+      rows: ["GOEDEMORGEN", "MIDDAGAVOND", "NACHTSLAPEN"],
+      morning: [[0, 0, 5], [0, 5, 6]], noon: [[0, 0, 5], [1, 0, 6]], evening: [[0, 0, 5], [1, 6, 5]], night: [[0, 0, 5], [2, 0, 5]],
+    },
+    v: {
+      rows: ["GOEDEX", "MORGEN", "MIDDAG", "AVONDZ", "NACHTS"],
+      morning: [[0, 0, 5], [1, 0, 6]], noon: [[0, 0, 5], [2, 0, 6]], evening: [[0, 0, 5], [3, 0, 5]], night: [[0, 0, 5], [4, 0, 5]],
+    },
   },
   fr: {
-    h: { rows: ["BONJOURSOIR", "BONNENUITXZ"], morning: [[0, 0, 7]], evening: [[0, 0, 3], [0, 7, 4]], night: [[1, 0, 5], [1, 5, 4]] },
-    v: { rows: ["BONJOUR", "BONSOIR", "BONNEXZ", "NUITPAM"], morning: [[0, 0, 7]], evening: [[1, 0, 7]], night: [[2, 0, 5], [3, 0, 4]] },
+    // Mittags gilt "Bonjour"
+    h: { rows: ["BONJOURSOIR", "BONNENUITXZ"], morning: [[0, 0, 7]], noon: [[0, 0, 7]], evening: [[0, 0, 3], [0, 7, 4]], night: [[1, 0, 5], [1, 5, 4]] },
+    v: { rows: ["BONJOUR", "BONSOIR", "BONNEXZ", "NUITPAM"], morning: [[0, 0, 7]], noon: [[0, 0, 7]], evening: [[1, 0, 7]], night: [[2, 0, 5], [3, 0, 4]] },
   },
   es: {
-    h: { rows: ["BUENOSKDÍAS", "BUENASXSOLY", "TARDESLUNAZ", "NOCHESXPMAR"], morning: [[0, 0, 6], [0, 7, 4]], evening: [[1, 0, 6], [2, 0, 6]], night: [[1, 0, 6], [3, 0, 6]] },
-    v: { rows: ["BUENOS", "DÍASXY", "BUENAS", "TARDES", "NOCHES"], morning: [[0, 0, 6], [1, 0, 4]], evening: [[2, 0, 6], [3, 0, 6]], night: [[2, 0, 6], [4, 0, 6]] },
+    // Mittags/nachmittags "Buenas tardes"
+    h: {
+      rows: ["BUENOSKDÍAS", "BUENASXSOLY", "TARDESLUNAZ", "NOCHESXPMAR"],
+      morning: [[0, 0, 6], [0, 7, 4]], noon: [[1, 0, 6], [2, 0, 6]], evening: [[1, 0, 6], [2, 0, 6]], night: [[1, 0, 6], [3, 0, 6]],
+    },
+    v: {
+      rows: ["BUENOS", "DÍASXY", "BUENAS", "TARDES", "NOCHES"],
+      morning: [[0, 0, 6], [1, 0, 4]], noon: [[2, 0, 6], [3, 0, 6]], evening: [[2, 0, 6], [3, 0, 6]], night: [[2, 0, 6], [4, 0, 6]],
+    },
   },
 };
 
 /** Gruß aus dem Zustand einer Entität (z. B. input_select "Morgen") */
 function greetingFromState(state) {
   const v = String(state || "").toLowerCase();
+  if (/mittag|noon|middag|midi/.test(v)) return "noon";
   if (/morg|morn|jour|d[ií]a/.test(v)) return "morning";
   if (/abend|even|avond|soir|tard/.test(v)) return "evening";
   if (/nacht|night|nuit|noche/.test(v)) return "night";
@@ -739,12 +779,97 @@ function greetingFromState(state) {
 function greetingForMinute(minute, cfg) {
   const m = parseTime(cfg.greeting_morning_start, 5 * 60);
   const me = parseTime(cfg.greeting_morning_end, 10 * 60);
+  const ns = parseTime(cfg.greeting_noon_start, 11 * 60 + 30);
+  const ne = parseTime(cfg.greeting_noon_end, 14 * 60);
   const e = parseTime(cfg.greeting_evening_start, 18 * 60);
   const n = parseTime(cfg.greeting_night_start, 22 * 60);
   if (inTimeWindow(minute, m, me)) return "morning";
+  if (inTimeWindow(minute, ns, ne)) return "noon";
   if (inTimeWindow(minute, e, n)) return "evening";
   if (inTimeWindow(minute, n, m)) return "night";
   return null;
+}
+
+// ---------- Anlässe ----------
+const OCCASION_TEXTS = {
+  de: { easter: "Frohe Ostern", christmas: "Frohe Weihnachten", newyear: "Frohes neues Jahr", birthday: "Happy Birthday", congrats: "Herzlichen Glückwunsch" },
+  en: { easter: "Happy Easter", christmas: "Merry Christmas", newyear: "Happy New Year", birthday: "Happy Birthday", congrats: "Congratulations" },
+  nl: { easter: "Vrolijk Pasen", christmas: "Vrolijk Kerstfeest", newyear: "Gelukkig Nieuwjaar", birthday: "Fijne Verjaardag", congrats: "Gefeliciteerd" },
+  fr: { easter: "Joyeuses Pâques", christmas: "Joyeux Noël", newyear: "Bonne Année", birthday: "Joyeux Anniversaire", congrats: "Félicitations" },
+  es: { easter: "Felices Pascuas", christmas: "Feliz Navidad", newyear: "Feliz Año Nuevo", birthday: "Feliz Cumpleaños", congrats: "Felicidades" },
+};
+
+/** Ostersonntag (gregorianisch, Gauß/Meeus) als { m, d } */
+function easterSunday(y) {
+  const a = y % 19;
+  const b = Math.floor(y / 100);
+  const c = y % 100;
+  const d = Math.floor(b / 4);
+  const e = b % 4;
+  const f = Math.floor((b + 8) / 25);
+  const g = Math.floor((b - f + 1) / 3);
+  const h = (19 * a + b - d - g + 15) % 30;
+  const i = Math.floor(c / 4);
+  const k = c % 4;
+  const l = (32 + 2 * e + 2 * i - h - k) % 7;
+  const m = Math.floor((a + 11 * h + 22 * l) / 451);
+  const month = Math.floor((h + l - 7 * m + 114) / 31);
+  const day = ((h + l - 7 * m + 114) % 31) + 1;
+  return { m: month, d: day };
+}
+
+/** "15.03. Anna, 02.11 Max; 24.12 Christkind" -> [{ d, m, name }] */
+function parseBirthdays(text) {
+  const out = [];
+  const re = /(\d{1,2})\.(\d{1,2})\.?(?:\d{2,4})?\s*([^,;\n]*)/g;
+  let m;
+  while ((m = re.exec(String(text || "")))) {
+    const d = Number(m[1]);
+    const mo = Number(m[2]);
+    if (d >= 1 && d <= 31 && mo >= 1 && mo <= 12) out.push({ d, m: mo, name: m[3].trim() });
+  }
+  return out;
+}
+
+/**
+ * Welcher Anlass gilt gerade? Reihenfolge: Glückwunsch > Geburtstag > Neujahr > Weihnachten > Ostern.
+ * day = { y, mo, d, h }, congrats = Glückwunsch-Entität aktiv
+ */
+function occasionFor(day, cfg, congrats) {
+  const texts = OCCASION_TEXTS[cfg.language] || OCCASION_TEXTS.de;
+  if (congrats) return { key: "congrats", text: texts.congrats };
+  const bday = parseBirthdays(cfg.birthdays).find((b) => b.d === day.d && b.m === day.mo);
+  if (bday) return { key: `birthday-${bday.name}`, text: texts.birthday, sub: bday.name };
+  if (cfg.occasion_newyear !== false && ((day.mo === 12 && day.d === 31 && day.h >= 18) || (day.mo === 1 && day.d === 1))) {
+    return { key: "newyear", text: texts.newyear };
+  }
+  if (cfg.occasion_christmas !== false && day.mo === 12 && day.d >= 24 && day.d <= 26) {
+    return { key: "christmas", text: texts.christmas };
+  }
+  if (cfg.occasion_easter !== false) {
+    const e = easterSunday(day.y);
+    const monday = new Date(Date.UTC(day.y, e.m - 1, e.d + 1));
+    if ((day.mo === e.m && day.d === e.d) || (day.mo === monday.getUTCMonth() + 1 && day.d === monday.getUTCDate())) {
+      return { key: "easter", text: texts.easter };
+    }
+  }
+  return null;
+}
+
+/** Datum (Jahr, Monat, Tag, Stunde) in einer Zeitzone */
+function wallDate(date, timeZone) {
+  if (timeZone) {
+    try {
+      const parts = {};
+      for (const p of new Intl.DateTimeFormat("en-GB", { timeZone, year: "numeric", month: "numeric", day: "numeric", hour: "numeric", hourCycle: "h23" }).formatToParts(date)) {
+        parts[p.type] = p.value;
+      }
+      return { y: Number(parts.year), mo: Number(parts.month), d: Number(parts.day), h: Number(parts.hour) % 24 };
+    } catch (e) {
+      // unbekannte Zeitzone -> Gerät
+    }
+  }
+  return { y: date.getFullYear(), mo: date.getMonth() + 1, d: date.getDate(), h: date.getHours() };
 }
 
 const LAYOUTS = {
@@ -891,6 +1016,7 @@ class ClockInLettersCard extends HTMLElement {
       this._applyNight();
       this._lightGreeting();
       this._checkMessage();
+      this._checkOccasion();
     }
     if (!this._synced && hass) {
       this._synced = true;
@@ -962,6 +1088,7 @@ class ClockInLettersCard extends HTMLElement {
     }
     clearTimeout(this._syncTimer);
     clearTimeout(this._msgTimer);
+    clearTimeout(this._occTimer);
     this._synced = false;
     if (this._listening) {
       this._listening = false;
@@ -1199,17 +1326,80 @@ class ClockInLettersCard extends HTMLElement {
   _showMessage(text) {
     clearTimeout(this._msgTimer);
     this._msgShown = text || null;
-    if (!this._face) return;
-    const box = this.shadowRoot.querySelector(".msg");
-    if (text && box) {
-      box.textContent = text;
-      // Lange Texte kleiner setzen
-      const size = (this._fontSize || 5) * Math.max(0.55, Math.min(1.4, 14 / Math.max(6, text.length)));
-      box.style.fontSize = `calc(${size} * var(--u, 1cqi))`;
+    if (text) {
       const duration = clamp(this._config.message_duration, 0, 86400, DEFAULTS.message_duration);
       if (duration > 0) this._msgTimer = setTimeout(() => this._showMessage(null), duration * 1000);
     }
-    this._face.classList.toggle("show-msg", !!text);
+    this._renderOverlay();
+  }
+
+  /** Großanzeige: Nachricht hat Vorrang vor Anlass */
+  _renderOverlay() {
+    if (!this._face) return;
+    const box = this.shadowRoot.querySelector(".msg");
+    const item = this._msgShown ? { text: this._msgShown } : this._occShown;
+    if (item && box) {
+      const esc = (t) => String(t).replace(/[&<>"]/g, (ch) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[ch]);
+      box.innerHTML = esc(item.text) + (item.sub ? `<div class="msg-sub">${esc(item.sub)}</div>` : "");
+      const len = Math.max(item.text.length, (item.sub || "").length);
+      // Lange Texte kleiner setzen
+      const size = (this._fontSize || 5) * Math.max(0.55, Math.min(1.4, 14 / Math.max(6, len)));
+      box.style.fontSize = `calc(${size} * var(--u, 1cqi))`;
+      const occColor = !this._msgShown && this._config.occasion_color ? toCss(this._config.occasion_color) : "";
+      box.style.color = occColor;
+      box.style.textShadow = occColor && this._config.glow ? `0 0 0.3em ${occColor}` : "";
+    }
+    this._face.classList.toggle("show-msg", !!item);
+  }
+
+  /** Anlass prüfen (jede Minute und bei Änderungen in HA) */
+  _checkOccasion() {
+    const c = this._config || {};
+    const hide = () => {
+      clearTimeout(this._occTimer);
+      if (this._occShown) {
+        this._occShown = null;
+        this._renderOverlay();
+      }
+    };
+    if (!c.occasions) return hide();
+    let congrats = false;
+    if (c.congrats_entity) {
+      const st = this._hass && this._hass.states && this._hass.states[c.congrats_entity];
+      const v = st ? String(st.state).trim().toLowerCase() : "";
+      congrats = !!v && !["off", "false", "unknown", "unavailable", "none", "closed", "0"].includes(v);
+    }
+    const day = wallDate(new Date(this._nowMs()), this._timeZone());
+    const occ = occasionFor(day, c, congrats);
+    if (!occ) {
+      this._occKey = null;
+      return hide();
+    }
+    const show = (seconds) => {
+      clearTimeout(this._occTimer);
+      this._occShown = occ;
+      this._renderOverlay();
+      if (seconds > 0) {
+        this._occTimer = setTimeout(() => {
+          this._occShown = null;
+          this._renderOverlay();
+        }, seconds * 1000);
+      }
+    };
+    if (c.occasion_display === "permanent") {
+      if (!this._occShown || this._occShown.key !== occ.key) show(0);
+      this._occKey = occ.key;
+      return;
+    }
+    const minute = day.h * 60 + this._now().getMinutes();
+    const every = clamp(c.occasion_interval, 1, 720, DEFAULTS.occasion_interval);
+    const seconds = clamp(c.occasion_duration, 3, 3600, DEFAULTS.occasion_duration);
+    // Neuer Anlass (z. B. Glückwunsch eingeschaltet) sofort zeigen, sonst im Takt
+    if (occ.key !== this._occKey || (minute % every === 0 && minute !== this._occMinute)) {
+      this._occMinute = minute;
+      show(seconds);
+    }
+    this._occKey = occ.key;
   }
 
   /** Anwesenheit: Bewegungsmelder o. Ä. aus -> dimmen */
@@ -1456,6 +1646,8 @@ class ClockInLettersCard extends HTMLElement {
           pointer-events: none;
           transition: opacity 0.6s ease;
         }
+        .msg { flex-direction: column; }
+        .msg .msg-sub { font-size: 0.8em; margin-top: 0.6em; }
         .face.show-msg .grid,
         .face.show-msg .greet,
         .face.show-msg .info { opacity: 0; }
@@ -1726,12 +1918,7 @@ class ClockInLettersCard extends HTMLElement {
       this._fillInfo();
       this._face.classList.add("show-info");
     }
-    if (this._msgShown) {
-      const box = this.shadowRoot.querySelector(".msg");
-      box.textContent = this._msgShown;
-      box.style.fontSize = `calc(${fontSize * Math.max(0.55, Math.min(1.4, 14 / Math.max(6, this._msgShown.length)))} * var(--u, 1cqi))`;
-      this._face.classList.add("show-msg");
-    }
+    if (this._msgShown || this._occShown) this._renderOverlay();
     this._night = undefined;
     this._prevLit = undefined;
     this._built = true;
@@ -1793,6 +1980,7 @@ class ClockInLettersCard extends HTMLElement {
     });
     this._prevLit = lit;
     this._lightGreeting();
+    this._checkOccasion();
     this._dots.forEach((el, idx) => el.classList.toggle("on", idx < dots));
     // Schutz vor Einbrennen
     const [sx, sy] = this._config.burn_in_protection
@@ -1863,7 +2051,8 @@ class ClockInLettersCardEditor extends HTMLElement {
     for (const key of COLOR_KEYS) {
       this._shownCodes[key] = colorCodeOf(data[key]);
       data[`${key}_code`] = this._shownCodes[key];
-      data[key] = toRgb(data[key]);
+      if (data[key] === "" || data[key] == null) delete data[key];
+      else data[key] = toRgb(data[key]);
     }
     if (typeof data.padding === "string") data.padding = parseFloat(data.padding) || DEFAULTS.padding;
     this._form.data = data;
@@ -1875,11 +2064,23 @@ function sameValue(a, b) {
 }
 
 const LABELS = {
-  greeting: "Grußzeilen anzeigen (Guten Morgen / Abend / Gute Nacht)",
+  occasions: "Anlässe anzeigen (Ostern, Weihnachten, Neujahr, Geburtstage …)",
+  occasion_easter: "Ostern",
+  occasion_christmas: "Weihnachten",
+  occasion_newyear: "Silvester / Neujahr",
+  birthdays: "Geburtstage (z. B. 15.03. Anna, 02.11. Max)",
+  congrats_entity: "Glückwunsch-Entität (an = „Herzlichen Glückwunsch“)",
+  occasion_display: "Anzeige",
+  occasion_interval: "Einblenden alle",
+  occasion_duration: "Einblenden für",
+  occasion_color: "Farbe für Anlässe (leer = Buchstabenfarbe)",
+  greeting: "Grußzeilen anzeigen (Guten Morgen / Mittag / Abend / Gute Nacht)",
   greeting_position: "Position der Grußzeilen",
   greeting_entity: "Gruß aus Entität (optional, statt Uhrzeit)",
   greeting_morning_start: "Morgen ab",
   greeting_morning_end: "Morgen bis",
+  greeting_noon_start: "Mittag ab",
+  greeting_noon_end: "Mittag bis",
   greeting_evening_start: "Abend ab",
   greeting_night_start: "Nacht ab",
   message_entity: "Nachricht aus Entität (z. B. input_text)",
@@ -1988,7 +2189,7 @@ function sizeSection(data) {
   };
 }
 
-const COLOR_KEYS = ["color_on", "color_off", "background", "alert_color", "fullscreen_background"];
+const COLOR_KEYS = ["color_on", "color_off", "background", "alert_color", "fullscreen_background", "occasion_color"];
 
 /** Neben jeden Farbwähler ein Feld für Hex-, RGB- oder RAL-Code setzen */
 function withColorCodes(schema) {
@@ -2035,6 +2236,8 @@ function greetingSection(data) {
         schema: [
           { name: "greeting_morning_start", selector: { time: {} } },
           { name: "greeting_morning_end", selector: { time: {} } },
+          { name: "greeting_noon_start", selector: { time: {} } },
+          { name: "greeting_noon_end", selector: { time: {} } },
           { name: "greeting_evening_start", selector: { time: {} } },
           { name: "greeting_night_start", selector: { time: {} } },
         ],
@@ -2055,9 +2258,56 @@ function greetingSection(data) {
   };
 }
 
+/** Anlässe: Details nur zeigen, wenn eingeschaltet */
+function occasionSection(data) {
+  const schema = [{ name: "occasions", selector: { boolean: {} } }];
+  if (data.occasions) {
+    schema.push(
+      {
+        type: "grid",
+        name: "",
+        schema: [
+          { name: "occasion_easter", selector: { boolean: {} } },
+          { name: "occasion_christmas", selector: { boolean: {} } },
+          { name: "occasion_newyear", selector: { boolean: {} } },
+        ],
+      },
+      { name: "birthdays", selector: { text: { multiline: true } } },
+      { name: "congrats_entity", selector: { entity: {} } },
+      {
+        name: "occasion_display",
+        selector: {
+          select: {
+            mode: "dropdown",
+            options: [
+              { value: "interval", label: "Regelmäßig einblenden" },
+              { value: "permanent", label: "Dauerhaft statt der Uhr" },
+            ],
+          },
+        },
+      }
+    );
+    if (data.occasion_display !== "permanent") {
+      schema.push(
+        { name: "occasion_interval", selector: { number: { min: 1, max: 60, step: 1, mode: "slider", unit_of_measurement: "min" } } },
+        { name: "occasion_duration", selector: { number: { min: 5, max: 300, step: 5, mode: "slider", unit_of_measurement: "s" } } }
+      );
+    }
+    schema.push({ name: "occasion_color", selector: { color_rgb: {} } });
+  }
+  return {
+    type: "expandable",
+    name: "anlaesse",
+    flatten: true,
+    title: "Anlässe",
+    icon: "mdi:party-popper",
+    schema,
+  };
+}
+
 function buildSchema(data) {
   const i = SCHEMA.findIndex((s) => s.name === "bildschirm");
-  return withColorCodes([...SCHEMA.slice(0, i), greetingSection(data), sizeSection(data), ...SCHEMA.slice(i)]);
+  return withColorCodes([...SCHEMA.slice(0, i), greetingSection(data), occasionSection(data), sizeSection(data), ...SCHEMA.slice(i)]);
 }
 
 const slider = (min, max, step = 1) => ({
@@ -2397,4 +2647,4 @@ console.info(
   "color: #fff; background: #111;"
 );
 
-if (typeof module !== "undefined") module.exports = { GREETINGS, greetingFromState, greetingForMinute, parseColorCode, normalizeColorCode, colorCodeOf, RAL_CLASSIC, LAYOUTS, hsToRgb, isActive, wallClock, parseTime, inTimeWindow, GRID_EN, computeWords, wordsToText, toCss, toRgb, resolveFont, withTheme, THEMES };
+if (typeof module !== "undefined") module.exports = { easterSunday, parseBirthdays, occasionFor, wallDate, OCCASION_TEXTS, GREETINGS, greetingFromState, greetingForMinute, parseColorCode, normalizeColorCode, colorCodeOf, RAL_CLASSIC, LAYOUTS, hsToRgb, isActive, wallClock, parseTime, inTimeWindow, GRID_EN, computeWords, wordsToText, toCss, toRgb, resolveFont, withTheme, THEMES };

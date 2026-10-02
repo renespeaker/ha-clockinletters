@@ -2,6 +2,13 @@
 
 Alle Versionen der Karte „Clock in Letters“. Die neueste steht oben.
 
+## [1.12.0] – 2026-10-03
+
+- Grußzeilen: „Guten Mittag“ (Good afternoon, Goedemiddag …), Zeitraum einstellbar
+- Anlässe (standardmäßig aus): Frohe Ostern, Frohe Weihnachten, Frohes neues Jahr,
+  Happy Birthday mit Namen, Herzlichen Glückwunsch über eine Entität – in der gewählten
+  Sprache, groß im Stil der Uhr; Takt, Dauer, Daueranzeige und Farbe einstellbar
+
 ## [1.11.0] – 2026-10-03
 
 - Grußzeilen „Guten Morgen / Guten Abend / Gute Nacht“ (in allen Sprachen), oben, unten,
