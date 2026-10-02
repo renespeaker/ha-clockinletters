@@ -140,12 +140,9 @@ und werden in HACS als Update angezeigt. Was sich geändert hat, steht in der
 ### Neue Version veröffentlichen (für Entwickler)
 
 1. `CARD_VERSION` in `clockinletters-card.js` erhöhen, z. B. auf `1.6.0`
-2. Eintrag in `CHANGELOG.md` ergänzen und alles auf `main` pushen
-3. Tag pushen – GitHub erstellt das Release mit der Karten-Datei automatisch:
-   ```bash
-   git tag v1.6.0
-   git push origin v1.6.0
-   ```
+2. Eintrag `## [1.6.0] – Datum` in `CHANGELOG.md` ergänzen
+3. Auf `main` pushen – GitHub legt den Tag `v1.6.0` und das Release mit der
+   Karten-Datei automatisch an
 
 Tests lokal ausführen: `node tests/time.test.js`
 
