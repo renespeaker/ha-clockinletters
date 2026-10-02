@@ -5,7 +5,7 @@
  * plus vier Eck-Punkte für die Minuten zwischen den 5-Minuten-Schritten.
  */
 
-const CARD_VERSION = "1.10.0";
+const CARD_VERSION = "1.11.0";
 
 const GRID = [
   "ESKISTAFÜNF",
@@ -80,6 +80,16 @@ const DEFAULTS = {
   double_tap_action: "info", // dasselbe für Doppeltippen
   info_entities: [], // Werte, die bei "info" angezeigt werden (z. B. Temperatur)
   info_duration: 8, // Sekunden, bis wieder die Uhr erscheint
+  // Grußzeilen & Nachrichten
+  greeting: false, // Grußzeilen (Guten Morgen/Abend, Gute Nacht) anzeigen
+  greeting_position: "bottom", // top, bottom, left, right
+  greeting_entity: "", // optional: Entität bestimmt den Gruß (Zustand "Morgen", "Abend", "Nacht", sonst keiner)
+  greeting_morning_start: "05:00",
+  greeting_morning_end: "10:00",
+  greeting_evening_start: "18:00",
+  greeting_night_start: "22:00",
+  message_entity: "", // z. B. input_text.uhr_nachricht – ihr Text erscheint auf der Uhr
+  message_duration: 30, // Sekunden; 0 = solange die Entität Text hat
   // Größe & Position
   custom_size: false, // false: quadratisch und automatisch – true: Breite/Höhe frei
   width: 100,
@@ -690,6 +700,53 @@ function computeWordsEs(date, cfg) {
   return { words, dots: minute % 5 };
 }
 
+// ---------- Grußzeilen ----------
+// h: Zeilen à 11 Buchstaben für oben/unten – v: schmaler Block für links/rechts.
+// Wörter je Gruß als [Zeile, Spalte, Länge].
+const GREETINGS = {
+  de: {
+    h: { rows: ["GUTENMORGEN", "ABENDXNACHT"], morning: [[0, 0, 5], [0, 5, 6]], evening: [[0, 0, 5], [1, 0, 5]], night: [[0, 0, 4], [1, 6, 5]] },
+    v: { rows: ["GUTENK", "MORGEN", "ABENDL", "NACHTU"], morning: [[0, 0, 5], [1, 0, 6]], evening: [[0, 0, 5], [2, 0, 5]], night: [[0, 0, 4], [3, 0, 5]] },
+  },
+  en: {
+    h: { rows: ["GOODMORNING", "EVENINGTIME", "NIGHTSLEEPS"], morning: [[0, 0, 4], [0, 4, 7]], evening: [[0, 0, 4], [1, 0, 7]], night: [[0, 0, 4], [2, 0, 5]] },
+    v: { rows: ["GOODXAM", "MORNING", "EVENING", "NIGHTPM"], morning: [[0, 0, 4], [1, 0, 7]], evening: [[0, 0, 4], [2, 0, 7]], night: [[0, 0, 4], [3, 0, 5]] },
+  },
+  nl: {
+    h: { rows: ["GOEDEMORGEN", "AVONDXNACHT"], morning: [[0, 0, 5], [0, 5, 6]], evening: [[0, 0, 5], [1, 0, 5]], night: [[0, 0, 5], [1, 6, 5]] },
+    v: { rows: ["GOEDEX", "MORGEN", "AVONDZ", "NACHTS"], morning: [[0, 0, 5], [1, 0, 6]], evening: [[0, 0, 5], [2, 0, 5]], night: [[0, 0, 5], [3, 0, 5]] },
+  },
+  fr: {
+    h: { rows: ["BONJOURSOIR", "BONNENUITXZ"], morning: [[0, 0, 7]], evening: [[0, 0, 3], [0, 7, 4]], night: [[1, 0, 5], [1, 5, 4]] },
+    v: { rows: ["BONJOUR", "BONSOIR", "BONNEXZ", "NUITPAM"], morning: [[0, 0, 7]], evening: [[1, 0, 7]], night: [[2, 0, 5], [3, 0, 4]] },
+  },
+  es: {
+    h: { rows: ["BUENOSKDÍAS", "BUENASXSOLY", "TARDESLUNAZ", "NOCHESXPMAR"], morning: [[0, 0, 6], [0, 7, 4]], evening: [[1, 0, 6], [2, 0, 6]], night: [[1, 0, 6], [3, 0, 6]] },
+    v: { rows: ["BUENOS", "DÍASXY", "BUENAS", "TARDES", "NOCHES"], morning: [[0, 0, 6], [1, 0, 4]], evening: [[2, 0, 6], [3, 0, 6]], night: [[2, 0, 6], [4, 0, 6]] },
+  },
+};
+
+/** Gruß aus dem Zustand einer Entität (z. B. input_select "Morgen") */
+function greetingFromState(state) {
+  const v = String(state || "").toLowerCase();
+  if (/morg|morn|jour|d[ií]a/.test(v)) return "morning";
+  if (/abend|even|avond|soir|tard/.test(v)) return "evening";
+  if (/nacht|night|nuit|noche/.test(v)) return "night";
+  return null;
+}
+
+/** Gruß nach Uhrzeit (Minute des Tages) */
+function greetingForMinute(minute, cfg) {
+  const m = parseTime(cfg.greeting_morning_start, 5 * 60);
+  const me = parseTime(cfg.greeting_morning_end, 10 * 60);
+  const e = parseTime(cfg.greeting_evening_start, 18 * 60);
+  const n = parseTime(cfg.greeting_night_start, 22 * 60);
+  if (inTimeWindow(minute, m, me)) return "morning";
+  if (inTimeWindow(minute, e, n)) return "evening";
+  if (inTimeWindow(minute, n, m)) return "night";
+  return null;
+}
+
 const LAYOUTS = {
   de: { grid: GRID, compute: computeWordsDe, locale: "de-DE" },
   en: { grid: GRID_EN, compute: computeWordsEn, locale: "en-GB" },
@@ -830,7 +887,11 @@ class ClockInLettersCard extends HTMLElement {
       this._dynKey = dyn;
       if (changed && this.isConnected) this._render();
     }
-    if (this._built) this._applyNight();
+    if (this._built) {
+      this._applyNight();
+      this._lightGreeting();
+      this._checkMessage();
+    }
     if (!this._synced && hass) {
       this._synced = true;
       this._syncServerTime();
@@ -900,6 +961,7 @@ class ClockInLettersCard extends HTMLElement {
       this._ro = null;
     }
     clearTimeout(this._syncTimer);
+    clearTimeout(this._msgTimer);
     this._synced = false;
     if (this._listening) {
       this._listening = false;
@@ -1092,6 +1154,64 @@ class ClockInLettersCard extends HTMLElement {
     }
   }
 
+  /** Welcher Gruß gerade gilt: Entität (falls gesetzt) oder Uhrzeit */
+  _greetingKey() {
+    const c = this._config || {};
+    if (c.greeting_entity) {
+      const st = this._hass && this._hass.states && this._hass.states[c.greeting_entity];
+      return st ? greetingFromState(st.state) : null;
+    }
+    const now = this._now();
+    return greetingForMinute(now.getHours() * 60 + now.getMinutes(), c);
+  }
+
+  _lightGreeting() {
+    if (!this._greetDef || !this._gcells) return;
+    const key = this._greetingKey();
+    if (key === this._greetKey) return;
+    this._greetKey = key;
+    const lit = new Set();
+    for (const [r, c, l] of (key && this._greetDef[key]) || []) {
+      for (let i = c; i < c + l; i++) lit.add(r * this._greetCols + i);
+    }
+    this._gcells.forEach((el, idx) => el.classList.toggle("on", lit.has(idx)));
+  }
+
+  /** Nachricht aus einer Entität (z. B. input_text) anzeigen */
+  _checkMessage() {
+    const c = this._config || {};
+    if (!c.message_entity) {
+      if (this._msgShown) this._showMessage(null);
+      return;
+    }
+    const st = this._hass && this._hass.states && this._hass.states[c.message_entity];
+    const text = st ? String(st.state).trim() : "";
+    const valid = !!text && !["unknown", "unavailable", "none", "off"].includes(text.toLowerCase());
+    if (text === this._lastMsg) return;
+    const first = this._lastMsg === undefined;
+    this._lastMsg = text;
+    const duration = clamp(c.message_duration, 0, 86400, DEFAULTS.message_duration);
+    // Beim Laden des Dashboards nur dauerhafte Nachrichten zeigen, sonst nur neue
+    if (valid && (!first || duration === 0)) this._showMessage(text);
+    else if (!valid) this._showMessage(null);
+  }
+
+  _showMessage(text) {
+    clearTimeout(this._msgTimer);
+    this._msgShown = text || null;
+    if (!this._face) return;
+    const box = this.shadowRoot.querySelector(".msg");
+    if (text && box) {
+      box.textContent = text;
+      // Lange Texte kleiner setzen
+      const size = (this._fontSize || 5) * Math.max(0.55, Math.min(1.4, 14 / Math.max(6, text.length)));
+      box.style.fontSize = `calc(${size} * var(--u, 1cqi))`;
+      const duration = clamp(this._config.message_duration, 0, 86400, DEFAULTS.message_duration);
+      if (duration > 0) this._msgTimer = setTimeout(() => this._showMessage(null), duration * 1000);
+    }
+    this._face.classList.toggle("show-msg", !!text);
+  }
+
   /** Anwesenheit: Bewegungsmelder o. Ä. aus -> dimmen */
   _isAbsent() {
     const c = this._config || {};
@@ -1180,6 +1300,30 @@ class ClockInLettersCard extends HTMLElement {
       : "";
     const offX = clamp(c.offset_x, -4000, 4000, 0);
     const offY = clamp(c.offset_y, -4000, 4000, 0);
+    // Grußzeilen: zusätzlicher Platz oben/unten/links/rechts neben dem Raster
+    const greetPos = ["top", "bottom", "left", "right"].includes(c.greeting_position) ? c.greeting_position : "bottom";
+    const greetSide = greetPos === "left" || greetPos === "right";
+    const greetDef = c.greeting ? (GREETINGS[c.language] || GREETINGS.de)[greetSide ? "v" : "h"] : null;
+    const padNum = clamp(parseFloat(c.padding), 0, 25, 8);
+    const gridSize = 100 - 2 * padNum; // Rastergröße in Einheiten von --u (1 % der kürzeren Seite)
+    const rowPitch = gridSize / 10;
+    const colPitch = gridSize / 11;
+    const greetRows = greetDef ? greetDef.rows.length : 0;
+    const greetCols = greetDef ? Math.max(...greetDef.rows.map((r) => [...r].length)) : 0;
+    const extra = !greetDef ? 0 : greetSide ? (greetCols + 1.2) * colPitch : (greetRows + 0.6) * rowPitch;
+    const U = (n) => `calc(${n} * var(--u, 1cqi))`;
+    // Ohne freie Größe: alles in --u, damit das Raster quadratisch bleibt
+    const pad = custom ? padding : U(padNum);
+    const insetGrid = !greetDef
+      ? padding
+      : [
+          greetPos === "top" ? `calc(${pad} + ${U(extra)})` : pad,
+          greetPos === "right" ? `calc(${pad} + ${U(extra)})` : pad,
+          greetPos === "bottom" ? `calc(${pad} + ${U(extra)})` : pad,
+          greetPos === "left" ? `calc(${pad} + ${U(extra)})` : pad,
+        ].join(" ");
+    const faceAspect = !greetDef ? "1 / 1" : greetSide ? `${100 + extra} / 100` : `100 / ${100 + extra}`;
+    const fitFactor = !greetDef ? 1 : greetSide ? (100 + extra) / 100 : 100 / (100 + extra);
 
     const letters = layout.grid
       .map(
@@ -1233,8 +1377,8 @@ class ClockInLettersCard extends HTMLElement {
           /* Nie höher als der sichtbare Bildschirm (Kopfzeile von HA abgezogen) */
           ${
             fit && !custom
-              ? `max-width: calc(100vh - var(--header-height, 56px) - 24px);
-                 max-width: calc(100dvh - var(--header-height, 56px) - 24px);`
+              ? `max-width: calc((100vh - var(--header-height, 56px) - 24px) * ${fitFactor});
+                 max-width: calc((100dvh - var(--header-height, 56px) - 24px) * ${fitFactor});`
               : ""
           }
         }
@@ -1288,8 +1432,65 @@ class ClockInLettersCard extends HTMLElement {
         .info .i-sub { font-size: calc(${fontSize} * var(--u, 1cqi)); letter-spacing: 0.3em; margin-bottom: 1.6em; }
         .info .i-name { font-size: calc(${fontSize * 0.5} * var(--u, 1cqi)); letter-spacing: 0.25em; color: var(--ct-off); text-shadow: none; margin-top: 1.2em; }
         .info .i-value { font-size: calc(${fontSize * 1.1} * var(--u, 1cqi)); letter-spacing: 0.15em; text-transform: none; }
-        .face.show-info .grid { opacity: 0; }
+        .face.show-info .grid,
+        .face.show-info .greet { opacity: 0; }
         .face.show-info .info { opacity: 1; }
+        /* Nachricht aus Home Assistant */
+        .msg {
+          position: absolute;
+          inset: ${padding};
+          z-index: 1;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          text-align: center;
+          font-family: ${resolveFont(c.font_family)};
+          font-weight: ${c.font_weight || DEFAULTS.font_weight};
+          text-transform: uppercase;
+          letter-spacing: 0.3em;
+          line-height: 1.5;
+          overflow-wrap: anywhere;
+          color: ${onLit};
+          ${glow ? `text-shadow: 0 0 ${glow * 0.3}em var(--ct-on);` : ""}
+          opacity: 0;
+          pointer-events: none;
+          transition: opacity 0.6s ease;
+        }
+        .face.show-msg .grid,
+        .face.show-msg .greet,
+        .face.show-msg .info { opacity: 0; }
+        .face.show-msg .msg { opacity: 1; }
+        ${
+          greetDef
+            ? `
+        /* Grußzeilen */
+        .greet {
+          position: absolute;
+          z-index: 1;
+          display: flex;
+          flex-direction: column;
+          justify-content: space-between;
+          font-family: ${resolveFont(c.font_family)};
+          font-weight: ${c.font_weight || DEFAULTS.font_weight};
+          font-size: calc(${fontSize} * var(--u, 1cqi));
+          line-height: 1;
+          user-select: none;
+          transition: transform 2s ease, opacity 0.6s ease;
+          ${
+            greetSide
+              ? `${greetPos}: ${pad};
+          width: ${U(greetCols * colPitch)};
+          height: ${U((greetRows - 1) * rowPitch + fontSize)};
+          top: calc(50% - ${U(((greetRows - 1) * rowPitch + fontSize) / 2)});`
+              : `left: ${pad};
+          right: ${pad};
+          ${greetPos}: ${pad};
+          height: ${U((greetRows - 1) * rowPitch + fontSize)};`
+          }
+        }
+        .greet .row { display: flex; justify-content: space-between; }`
+            : ""
+        }
         /* Alarm: leuchtende Buchstaben pulsieren */
         ${
           dynamic && dynamic.alert && c.alert_pulse !== false
@@ -1298,7 +1499,7 @@ class ClockInLettersCard extends HTMLElement {
             : ""
         }
         /* Schutz vor Einbrennen: Inhalt jede Minute minimal verschieben */
-        .grid, .dot {
+        .grid, .dot, .greet {
           transform: translate(calc(var(--shift-x, 0) * var(--u, 1cqi)), calc(var(--shift-y, 0) * var(--u, 1cqi)));
         }
         /* Nachtmodus: Uhr gedimmt, auf Wunsch nur die leuchtenden Buchstaben */
@@ -1355,7 +1556,7 @@ class ClockInLettersCard extends HTMLElement {
         }
         .face {
           position: relative;
-          aspect-ratio: ${custom ? "auto" : "1 / 1"};
+          aspect-ratio: ${custom ? "auto" : faceAspect};
           width: 100%;
           container-type: inline-size;
           box-sizing: border-box;
@@ -1395,7 +1596,7 @@ class ClockInLettersCard extends HTMLElement {
         }
         .grid {
           position: absolute;
-          inset: ${padding};
+          inset: ${insetGrid};
           z-index: 1;
           display: flex;
           flex-direction: column;
@@ -1490,12 +1691,33 @@ class ClockInLettersCard extends HTMLElement {
           <div class="face" role="img">
             ${dots}
             <div class="grid">${letters}</div>
+            ${
+              greetDef
+                ? `<div class="greet">${greetDef.rows
+                    .map(
+                      (row) =>
+                        `<div class="row">${[...row]
+                          .map((ch) => {
+                            const inner = stencil && STENCIL_CHARS.includes(ch) ? `<i class="st">${ch}</i>` : ch;
+                            return `<span class="l">${inner}</span>`;
+                          })
+                          .join("")}</div>`
+                    )
+                    .join("")}</div>`
+                : ""
+            }
             <div class="info" aria-live="polite"></div>
+            <div class="msg" aria-live="polite"></div>
           </div>
         </div>
       </ha-card>
     `;
-    this._cells = [...this.shadowRoot.querySelectorAll(".l")];
+    this._cells = [...this.shadowRoot.querySelectorAll(".grid .l")];
+    this._gcells = [...this.shadowRoot.querySelectorAll(".greet .l")];
+    this._greetDef = greetDef;
+    this._greetCols = greetCols;
+    this._greetKey = undefined;
+    this._fontSize = fontSize;
     this._layout = layout;
     this._dots = [...this.shadowRoot.querySelectorAll(".dot")];
     this._face = this.shadowRoot.querySelector(".face");
@@ -1503,6 +1725,12 @@ class ClockInLettersCard extends HTMLElement {
     if (this._infoShown) {
       this._fillInfo();
       this._face.classList.add("show-info");
+    }
+    if (this._msgShown) {
+      const box = this.shadowRoot.querySelector(".msg");
+      box.textContent = this._msgShown;
+      box.style.fontSize = `calc(${fontSize * Math.max(0.55, Math.min(1.4, 14 / Math.max(6, this._msgShown.length)))} * var(--u, 1cqi))`;
+      this._face.classList.add("show-msg");
     }
     this._night = undefined;
     this._prevLit = undefined;
@@ -1564,6 +1792,7 @@ class ClockInLettersCard extends HTMLElement {
       el.classList.toggle("on", now);
     });
     this._prevLit = lit;
+    this._lightGreeting();
     this._dots.forEach((el, idx) => el.classList.toggle("on", idx < dots));
     // Schutz vor Einbrennen
     const [sx, sy] = this._config.burn_in_protection
@@ -1646,6 +1875,15 @@ function sameValue(a, b) {
 }
 
 const LABELS = {
+  greeting: "Grußzeilen anzeigen (Guten Morgen / Abend / Gute Nacht)",
+  greeting_position: "Position der Grußzeilen",
+  greeting_entity: "Gruß aus Entität (optional, statt Uhrzeit)",
+  greeting_morning_start: "Morgen ab",
+  greeting_morning_end: "Morgen bis",
+  greeting_evening_start: "Abend ab",
+  greeting_night_start: "Nacht ab",
+  message_entity: "Nachricht aus Entität (z. B. input_text)",
+  message_duration: "Nachricht anzeigen für (0 = solange Text da ist)",
   custom_size: "Breite und Höhe frei einstellen",
   width: "Breite (X)",
   width_unit: "Einheit Breite",
@@ -1769,9 +2007,57 @@ function withColorCodes(schema) {
   });
 }
 
+/** Grüße & Nachrichten: Details nur zeigen, wenn eingeschaltet */
+function greetingSection(data) {
+  const schema = [{ name: "greeting", selector: { boolean: {} } }];
+  if (data.greeting) {
+    schema.push(
+      {
+        name: "greeting_position",
+        selector: {
+          select: {
+            mode: "dropdown",
+            options: [
+              { value: "bottom", label: "Unten" },
+              { value: "top", label: "Oben" },
+              { value: "left", label: "Links" },
+              { value: "right", label: "Rechts" },
+            ],
+          },
+        },
+      },
+      { name: "greeting_entity", selector: { entity: {} } }
+    );
+    if (!data.greeting_entity) {
+      schema.push({
+        type: "grid",
+        name: "",
+        schema: [
+          { name: "greeting_morning_start", selector: { time: {} } },
+          { name: "greeting_morning_end", selector: { time: {} } },
+          { name: "greeting_evening_start", selector: { time: {} } },
+          { name: "greeting_night_start", selector: { time: {} } },
+        ],
+      });
+    }
+  }
+  schema.push(
+    { name: "message_entity", selector: { entity: {} } },
+    { name: "message_duration", selector: { number: { min: 0, max: 600, step: 5, mode: "slider", unit_of_measurement: "s" } } }
+  );
+  return {
+    type: "expandable",
+    name: "gruesse",
+    flatten: true,
+    title: "Grüße & Nachrichten",
+    icon: "mdi:message-text-outline",
+    schema,
+  };
+}
+
 function buildSchema(data) {
   const i = SCHEMA.findIndex((s) => s.name === "bildschirm");
-  return withColorCodes([...SCHEMA.slice(0, i), sizeSection(data), ...SCHEMA.slice(i)]);
+  return withColorCodes([...SCHEMA.slice(0, i), greetingSection(data), sizeSection(data), ...SCHEMA.slice(i)]);
 }
 
 const slider = (min, max, step = 1) => ({
@@ -2111,4 +2397,4 @@ console.info(
   "color: #fff; background: #111;"
 );
 
-if (typeof module !== "undefined") module.exports = { parseColorCode, normalizeColorCode, colorCodeOf, RAL_CLASSIC, LAYOUTS, hsToRgb, isActive, wallClock, parseTime, inTimeWindow, GRID_EN, computeWords, wordsToText, toCss, toRgb, resolveFont, withTheme, THEMES };
+if (typeof module !== "undefined") module.exports = { GREETINGS, greetingFromState, greetingForMinute, parseColorCode, normalizeColorCode, colorCodeOf, RAL_CLASSIC, LAYOUTS, hsToRgb, isActive, wallClock, parseTime, inTimeWindow, GRID_EN, computeWords, wordsToText, toCss, toRgb, resolveFont, withTheme, THEMES };

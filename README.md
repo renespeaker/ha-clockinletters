@@ -138,6 +138,65 @@ info_entities:
 info_duration: 8
 ```
 
+## Grüße & Nachrichten
+
+### Grußzeilen
+
+Im Menü **Grüße & Nachrichten** (standardmäßig aus) lassen sich Grußzeilen einschalten –
+wahlweise **oben, unten, links oder rechts** neben der Uhr:
+
+- **Guten Morgen** – standardmäßig 5–10 Uhr
+- **Guten Abend** – 18–22 Uhr
+- **Gute Nacht** – 22–5 Uhr
+
+Die Uhrzeiten sind einstellbar. Die Grüße gibt es in allen Sprachen der Uhr
+(Good morning, Goedemorgen, Bonjour, Buenos días …).
+
+Statt nach Uhrzeit kann auch eine **Entität** den Gruß bestimmen – z. B. ein
+`input_select` mit den Optionen „Morgen“, „Abend“, „Nacht“, „Aus“. So lässt sich der Gruß
+per Automation steuern (z. B. „Guten Morgen“ erst, wenn jemand aufgestanden ist).
+
+```yaml
+type: custom:clockinletters-card
+greeting: true
+greeting_position: bottom          # top, bottom, left, right
+greeting_entity: input_select.uhr_gruss   # optional
+```
+
+### Nachrichten
+
+Der Text einer Entität erscheint im Stil der Uhr – z. B. von einem `input_text`, den
+Automationen setzen:
+
+```yaml
+type: custom:clockinletters-card
+message_entity: input_text.uhr_nachricht
+message_duration: 30     # Sekunden; 0 = solange die Entität Text hat
+```
+
+Beispiel-Automation: Am Abend vor der Müllabfuhr „MÜLL RAUS“ anzeigen
+
+```yaml
+automation:
+  - alias: Uhr – Müll raus
+    trigger:
+      - platform: time
+        at: "19:00:00"
+    condition:
+      - condition: state
+        entity_id: sensor.muellabfuhr_morgen   # dein Abfall-Sensor
+        state: "on"
+    action:
+      - service: input_text.set_value
+        target:
+          entity_id: input_text.uhr_nachricht
+        data:
+          value: "Müll raus!"
+```
+
+Ist `message_duration: 0`, bleibt die Nachricht stehen, bis die Entität wieder leer ist
+(`input_text.set_value` mit `value: ""`).
+
 ## Home Assistant einbinden
 
 ```yaml
@@ -217,6 +276,14 @@ wall_mount: true
 | `alert_pulse`   | `true`            | Bei Alarm pulsieren |
 | `transition`    | `cascade`         | Minutenwechsel: `cascade` (Buchstabe für Buchstabe), `fade`, `none` |
 | `burn_in_protection` | `false`      | Uhr jede Minute minimal verschieben (Dauerbetrieb, OLED) |
+| `greeting`      | `false`           | Grußzeilen (Guten Morgen/Abend, Gute Nacht) anzeigen |
+| `greeting_position` | `bottom`      | `top`, `bottom`, `left`, `right` |
+| `greeting_entity` | –               | Entität bestimmt den Gruß (Zustand „Morgen“, „Abend“, „Nacht“, sonst keiner) |
+| `greeting_morning_start` / `_end` | `05:00` / `10:00` | Zeitraum „Guten Morgen“ |
+| `greeting_evening_start` | `18:00`  | Ab wann „Guten Abend“ |
+| `greeting_night_start` | `22:00`    | Ab wann „Gute Nacht“ (bis Morgen-Beginn) |
+| `message_entity` | –                | Entität, deren Text als Nachricht erscheint (z. B. `input_text`) |
+| `message_duration` | `30`           | Sekunden; `0` = solange die Entität Text hat |
 | `custom_size`   | `false`           | Breite und Höhe frei einstellen |
 | `width` / `width_unit` | `100` / `%` | Breite in `%` (der Karte) oder `px` |
 | `height` / `height_unit` | `100` / `vh` | Höhe in `vh` (% der Bildschirmhöhe) oder `px` |

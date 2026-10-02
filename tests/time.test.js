@@ -8,7 +8,7 @@ global.window = {};
 global.document = { getElementById: () => null };
 console.info = () => {};
 
-const { parseColorCode, normalizeColorCode, colorCodeOf, RAL_CLASSIC, computeWords, wordsToText, GRID_EN, LAYOUTS, wallClock, parseTime, inTimeWindow, hsToRgb, isActive } = require("../clockinletters-card.js");
+const { GREETINGS, greetingFromState, greetingForMinute, parseColorCode, normalizeColorCode, colorCodeOf, RAL_CLASSIC, computeWords, wordsToText, GRID_EN, LAYOUTS, wallClock, parseTime, inTimeWindow, hsToRgb, isActive } = require("../clockinletters-card.js");
 
 const de = (h, m, cfg = {}) =>
   wordsToText(computeWords(new Date(2026, 0, 1, h, m), { show_es_ist: true, dialect: "west", zwanzig: "zwanzig", ...cfg }).words);
@@ -170,4 +170,38 @@ assert.deepStrictEqual(normalizeColorCode("76, 75, 45"), [76, 75, 45]);
 assert.strictEqual(colorCodeOf([75, 87, 62]), "#4B573E");
 assert.strictEqual(colorCodeOf("RAL 6003"), "RAL 6003");
 
-console.log(`OK – ${cases.length} Uhrzeiten, alle 1440 Minuten, Zeitzonen, Nachtfenster und Farbcodes geprüft`);
+// Grußzeilen: Wörter liegen richtig, alle Zeilen gleich lang
+const expectGreet = {
+  de: { morning: "GUTEN MORGEN", evening: "GUTEN ABEND", night: "GUTE NACHT" },
+  en: { morning: "GOOD MORNING", evening: "GOOD EVENING", night: "GOOD NIGHT" },
+  nl: { morning: "GOEDE MORGEN", evening: "GOEDE AVOND", night: "GOEDE NACHT" },
+  fr: { morning: "BONJOUR", evening: "BON SOIR", night: "BONNE NUIT" },
+  es: { morning: "BUENOS DÍAS", evening: "BUENAS TARDES", night: "BUENAS NOCHES" },
+};
+for (const [lang, g] of Object.entries(GREETINGS)) {
+  for (const orient of ["h", "v"]) {
+    const def = g[orient];
+    const width = [...def.rows[0]].length;
+    if (orient === "h") assert.strictEqual(width, 11, `${lang} h`);
+    for (const row of def.rows) assert.strictEqual([...row].length, width, `${lang} ${orient}: ${row}`);
+    for (const key of ["morning", "evening", "night"]) {
+      const text = def[key].map(([r, c, l]) => [...def.rows[r]].slice(c, c + l).join("")).join(" ");
+      assert.strictEqual(text.replace(/ /g, ""), expectGreet[lang][key].replace(/ /g, ""), `${lang} ${orient} ${key}`);
+    }
+  }
+}
+const gcfg = { greeting_morning_start: "05:00", greeting_morning_end: "10:00", greeting_evening_start: "18:00", greeting_night_start: "22:00" };
+const g = (hhmm) => greetingForMinute(parseTime(hhmm), gcfg);
+assert.strictEqual(g("04:59"), "night");
+assert.strictEqual(g("05:00"), "morning");
+assert.strictEqual(g("09:59"), "morning");
+assert.strictEqual(g("10:00"), null);
+assert.strictEqual(g("17:59"), null);
+assert.strictEqual(g("18:00"), "evening");
+assert.strictEqual(g("22:00"), "night");
+assert.strictEqual(g("00:30"), "night");
+for (const [state, key] of [["Morgen", "morning"], ["Guten Abend", "evening"], ["nacht", "night"], ["night", "night"], ["Aus", null], ["off", null], ["", null]]) {
+  assert.strictEqual(greetingFromState(state), key, state);
+}
+
+console.log(`OK – ${cases.length} Uhrzeiten, alle 1440 Minuten, Zeitzonen, Nachtfenster, Farbcodes und Grüße geprüft`);

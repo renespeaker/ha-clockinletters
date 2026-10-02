@@ -2,6 +2,13 @@
 
 Alle Versionen der Karte „Clock in Letters“. Die neueste steht oben.
 
+## [1.11.0] – 2026-10-03
+
+- Grußzeilen „Guten Morgen / Guten Abend / Gute Nacht“ (in allen Sprachen), oben, unten,
+  links oder rechts; nach Uhrzeit oder gesteuert über eine Entität – standardmäßig aus
+- Nachrichten: Text einer Entität (z. B. `input_text`) erscheint im Stil der Uhr –
+  für eine einstellbare Dauer oder dauerhaft
+
 ## [1.10.0] – 2026-10-02
 
 - Farben per Code eingeben: Hex (`#4B573E`), RGB (`75, 87, 62`) oder RAL (`RAL 6003`) –
