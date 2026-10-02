@@ -2,6 +2,15 @@
 
 Alle Versionen der Karte „Clock in Letters“. Die neueste steht oben.
 
+## [1.7.0] – 2026-10-02
+
+- Minutenwechsel Buchstabe für Buchstabe (wählbar: Kaskade, Überblenden, sofort)
+- Farbe aus Home Assistant: Buchstaben in der Farbe einer Lampe; Alarmfarbe mit Pulsieren,
+  wenn z. B. eine Tür offen oder die Alarmanlage ausgelöst ist
+- Anwesenheit: ohne Bewegung wird die Uhr gedimmt
+- Schutz vor Einbrennen für Displays im Dauerbetrieb
+- Behoben: Minuten-Punkte leuchteten seit 1.5.1 nicht mehr nach
+
 ## [1.6.0] – 2026-10-02
 
 - Nachtmodus: dimmt nach Sonnenuntergang, in einem festen Zeitfenster oder über eine

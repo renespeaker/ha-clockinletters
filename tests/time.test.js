@@ -8,7 +8,7 @@ global.window = {};
 global.document = { getElementById: () => null };
 console.info = () => {};
 
-const { computeWords, wordsToText, GRID_EN, wallClock, parseTime, inTimeWindow } = require("../clockinletters-card.js");
+const { computeWords, wordsToText, GRID_EN, wallClock, parseTime, inTimeWindow, hsToRgb, isActive } = require("../clockinletters-card.js");
 
 const de = (h, m, cfg = {}) =>
   wordsToText(computeWords(new Date(2026, 0, 1, h, m), { show_es_ist: true, dialect: "west", zwanzig: "zwanzig", ...cfg }).words);
@@ -74,5 +74,13 @@ assert.strictEqual(night("12:00"), false);
 assert.strictEqual(night("21:59"), false);
 assert.strictEqual(inTimeWindow(parseTime("14:00"), parseTime("13:00"), parseTime("15:00")), true); // Fenster am Tag
 assert.strictEqual(inTimeWindow(parseTime("14:00"), parseTime("13:00"), parseTime("13:00")), false); // leeres Fenster
+
+// Lampenfarbe (Farbton/Sättigung) und aktive Zustände
+assert.deepStrictEqual(hsToRgb(0, 100), [255, 0, 0]);
+assert.deepStrictEqual(hsToRgb(120, 100), [0, 255, 0]);
+assert.deepStrictEqual(hsToRgb(240, 100), [0, 0, 255]);
+assert.deepStrictEqual(hsToRgb(30, 0), [255, 255, 255]);
+for (const st of ["on", "open", "triggered", "unlocked", "home"]) assert.ok(isActive(st), st);
+for (const st of ["off", "closed", "disarmed", "locked", "not_home", "unavailable"]) assert.ok(!isActive(st), st);
 
 console.log(`OK – ${cases.length} Uhrzeiten, alle 1440 Minuten, Zeitzonen und Nachtfenster geprüft`);

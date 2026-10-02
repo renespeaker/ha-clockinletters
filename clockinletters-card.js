@@ -5,7 +5,7 @@
  * plus vier Eck-Punkte für die Minuten zwischen den 5-Minuten-Schritten.
  */
 
-const CARD_VERSION = "1.6.0";
+const CARD_VERSION = "1.7.0";
 
 const GRID = [
   "ESKISTAFÜNF",
@@ -89,6 +89,15 @@ const DEFAULTS = {
   night_entity: "",
   night_brightness: 35, // Helligkeit nachts in %
   night_hide_unlit: false, // nachts nur die leuchtenden Buchstaben zeigen
+  presence_entity: "", // z. B. Bewegungsmelder: ist er aus, wird gedimmt wie nachts
+  // Darstellung beim Minutenwechsel
+  transition: "cascade", // cascade: Buchstabe für Buchstabe – fade: alle gleichzeitig – none: sofort
+  burn_in_protection: false, // Uhr jede Minute minimal verschieben (Dauerbetrieb, OLED)
+  // Farbe aus Home Assistant
+  color_entity: "", // Licht-Entität: leuchtende Buchstaben übernehmen deren Farbe
+  alert_entities: [], // ist eine davon aktiv (an/offen/ausgelöst), leuchtet die Uhr in alert_color
+  alert_color: [255, 45, 45],
+  alert_pulse: true,
 };
 
 // Farb-Vorlagen: setzen Farben, Deckkraft und Leucht-Effekt.
@@ -344,11 +353,31 @@ function inTimeWindow(minuteOfDay, start, end) {
   return start < end ? minuteOfDay >= start && minuteOfDay < end : minuteOfDay >= start || minuteOfDay < end;
 }
 
+// Zustände, die als "aktiv" gelten (Alarm-Entitäten, Bewegungsmelder)
+const ACTIVE_STATES = ["on", "open", "opening", "triggered", "pending", "arming", "unlocked", "detected", "home", "problem", "true"];
+const isActive = (state) => ACTIVE_STATES.includes(String(state).toLowerCase());
+
+// Kleine Verschiebungen gegen Einbrennen (in % der Uhrbreite), eine pro Minute
+const BURN_IN_SHIFTS = [
+  [0, 0], [0.6, 0.2], [0.3, 0.7], [-0.4, 0.5], [-0.7, -0.1], [-0.3, -0.6], [0.4, -0.5], [0.7, 0.1],
+  [0.2, 0.4], [-0.2, 0.2], [-0.5, -0.4], [0.1, -0.3],
+];
+
 /* Farben in JS mischen statt mit CSS color-mix() – das können ältere Browser
    (z. B. Kiosk-Browser auf Wandmonitoren, Chrome < 111) nicht. */
 const rgb = (c) => `rgb(${c.map(Math.round).join(", ")})`;
 const rgba = (c, a) => `rgba(${c.map(Math.round).join(", ")}, ${a})`;
 const mixRgb = (a, b, t) => a.map((v, i) => v + (b[i] - v) * t);
+
+/** Farbton/Sättigung (wie von HA-Lampen) -> [r, g, b] bei voller Helligkeit */
+function hsToRgb(h, s) {
+  s = Math.max(0, Math.min(100, s)) / 100;
+  const f = (n) => {
+    const k = (n + h / 60) % 6;
+    return 255 * (1 - s * Math.max(0, Math.min(k, 4 - k, 1)));
+  };
+  return [f(5), f(3), f(1)].map(Math.round);
+}
 
 function clamp(n, min, max, fallback) {
   const x = Number(n);
@@ -555,6 +584,13 @@ class ClockInLettersCard extends HTMLElement {
       if (this._built) this._update();
     }
     // Nachtmodus nach Sonne/Entität sofort nachführen
+    // Farbe aus HA (Lampe / Alarm) geändert -> neu zeichnen
+    const dyn = JSON.stringify(this._dynamicColor());
+    if (dyn !== this._dynKey) {
+      const changed = this._dynKey !== undefined;
+      this._dynKey = dyn;
+      if (changed && this.isConnected) this._render();
+    }
     if (this._built) this._applyNight();
     if (!this._synced && hass) {
       this._synced = true;
@@ -748,9 +784,33 @@ class ClockInLettersCard extends HTMLElement {
     }
   }
 
+  /** Anwesenheit: Bewegungsmelder o. Ä. aus -> dimmen */
+  _isAbsent() {
+    const c = this._config || {};
+    const st = c.presence_entity && this._hass && this._hass.states && this._hass.states[c.presence_entity];
+    return !!st && !isActive(st.state);
+  }
+
+  /** Farbe aus Home Assistant: Alarm > Lichtfarbe > null (eingestellte Farbe) */
+  _dynamicColor() {
+    const c = this._config || {};
+    const states = (this._hass && this._hass.states) || {};
+    const alerts = Array.isArray(c.alert_entities) ? c.alert_entities : c.alert_entities ? [c.alert_entities] : [];
+    if (alerts.some((id) => states[id] && isActive(states[id].state))) {
+      return { color: toRgb(c.alert_color) || DEFAULTS.alert_color, alert: true };
+    }
+    const light = c.color_entity && states[c.color_entity];
+    if (light && light.state === "on") {
+      const a = light.attributes || {};
+      if (Array.isArray(a.rgb_color)) return { color: a.rgb_color, alert: false };
+      if (Array.isArray(a.hs_color)) return { color: hsToRgb(a.hs_color[0], a.hs_color[1]), alert: false };
+    }
+    return null;
+  }
+
   _applyNight() {
     if (!this._face) return;
-    const night = this._isNight();
+    const night = this._isNight() || this._isAbsent();
     if (night !== this._night) {
       this._night = night;
       this._face.classList.toggle("night", night);
@@ -770,7 +830,9 @@ class ClockInLettersCard extends HTMLElement {
     if (!this._config) return;
     if (!this.shadowRoot) this.attachShadow({ mode: "open" });
     const c = this._config;
-    const on = toCss(c.color_on, DEFAULTS.color_on);
+    const dynamic = this._dynamicColor();
+    this._dynKey = JSON.stringify(dynamic);
+    const on = dynamic ? toCss(dynamic.color) : toCss(c.color_on, DEFAULTS.color_on);
     const offBase = toCss(c.color_off, DEFAULTS.color_off);
     const offOpacity = clamp(c.off_opacity, 0, 100, DEFAULTS.off_opacity);
     const bg = toCss(c.background, DEFAULTS.background);
@@ -866,6 +928,17 @@ class ClockInLettersCard extends HTMLElement {
           overflow: hidden;
         }`
             : ""
+        }
+        /* Alarm: leuchtende Buchstaben pulsieren */
+        ${
+          dynamic && dynamic.alert && c.alert_pulse !== false
+            ? `@keyframes ct-pulse { 50% { opacity: 0.35; } }
+        .l.on, .dot.on { animation: ct-pulse 1.4s ease-in-out infinite; }`
+            : ""
+        }
+        /* Schutz vor Einbrennen: Inhalt jede Minute minimal verschieben */
+        .grid, .dot {
+          transform: translate(calc(var(--shift-x, 0) * var(--u, 1cqi)), calc(var(--shift-y, 0) * var(--u, 1cqi)));
         }
         /* Nachtmodus: Uhr gedimmt, auf Wunsch nur die leuchtenden Buchstaben */
         .face {
@@ -968,6 +1041,7 @@ class ClockInLettersCard extends HTMLElement {
           font-size: calc(${fontSize} * var(--u, 1cqi));
           line-height: 1;
           user-select: none;
+          transition: transform 2s ease;
         }
         .row {
           display: flex;
@@ -978,7 +1052,7 @@ class ClockInLettersCard extends HTMLElement {
           flex: 1 1 0;
           text-align: center;
           color: var(--ct-off);
-          transition: color 1s ease, text-shadow 1s ease;
+          transition: ${c.transition === "none" ? "none" : "color 0.9s ease, text-shadow 0.9s ease"};
           ${realistic ? "text-shadow: -0.03em -0.03em 0 rgba(0, 0, 0, 0.3), 0.02em 0.02em 0 rgba(255, 255, 255, 0.06);" : ""}
         }
         .l.on {
@@ -1020,6 +1094,7 @@ class ClockInLettersCard extends HTMLElement {
           opacity: 0;
           z-index: -1;
           transition: opacity 1s ease;
+          transition-delay: inherit; /* Leuchtschein folgt dem Buchstaben */
           pointer-events: none;
         }
         .l.on::before {
@@ -1034,12 +1109,12 @@ class ClockInLettersCard extends HTMLElement {
           height: calc(1.4 * var(--u, 1cqi));
           border-radius: 50%;
           background: var(--ct-off);
-          transition: background 1s ease, box-shadow 1s ease;
+          transition: ${c.transition === "none" ? "none" : "background 0.9s ease, box-shadow 0.9s ease, transform 2s ease"};
           ${realistic ? "box-shadow: inset 0 calc(0.2 * var(--u, 1cqi)) calc(0.3 * var(--u, 1cqi)) rgba(0, 0, 0, 0.5), 0 calc(0.1 * var(--u, 1cqi)) 0 rgba(255, 255, 255, 0.1);" : ""}
         }
         .dot.on {
           background: ${onLit};
-          calc(${glow ? `box-shadow: 0 0 ${glow * 1.5} * var(--u, 1cqi)) var(--ct-on), 0 0 calc(${glow * 4} * var(--u, 1cqi)) var(--ct-on);` : ""}
+          ${glow ? `box-shadow: 0 0 calc(${glow * 1.5} * var(--u, 1cqi)) var(--ct-on), 0 0 calc(${glow * 4} * var(--u, 1cqi)) var(--ct-on);` : ""}
         }
         .d1 { top: calc(3.3 * var(--u, 1cqi)); left: calc(3.3 * var(--u, 1cqi)); }
         .d2 { top: calc(3.3 * var(--u, 1cqi)); right: calc(3.3 * var(--u, 1cqi)); }
@@ -1061,6 +1136,7 @@ class ClockInLettersCard extends HTMLElement {
     this._face = this.shadowRoot.querySelector(".face");
     this._observeSize();
     this._night = undefined;
+    this._prevLit = undefined;
     this._built = true;
     this._update();
   }
@@ -1101,8 +1177,29 @@ class ClockInLettersCard extends HTMLElement {
     for (const [r, c, l] of words) {
       for (let i = c; i < c + l; i++) lit.add(r * 11 + i);
     }
-    this._cells.forEach((el, idx) => el.classList.toggle("on", lit.has(idx)));
+    // Buchstabe für Buchstabe: erst verlöschen die alten, dann leuchten die neuen auf
+    const cascade = this._config.transition === "cascade" && this._prevLit;
+    let off = 0;
+    let on = 0;
+    const turningOff = this._cells.filter((el, idx) => el.classList.contains("on") && !lit.has(idx)).length;
+    this._cells.forEach((el, idx) => {
+      const was = el.classList.contains("on");
+      const now = lit.has(idx);
+      if (cascade && was !== now) {
+        el.style.transitionDelay = now ? `${turningOff * 45 + 350 + on++ * 70}ms` : `${off++ * 45}ms`;
+      } else {
+        el.style.transitionDelay = "";
+      }
+      el.classList.toggle("on", now);
+    });
+    this._prevLit = lit;
     this._dots.forEach((el, idx) => el.classList.toggle("on", idx < dots));
+    // Schutz vor Einbrennen
+    const [sx, sy] = this._config.burn_in_protection
+      ? BURN_IN_SHIFTS[Math.floor(this._nowMs() / 60000) % BURN_IN_SHIFTS.length]
+      : [0, 0];
+    this._face.style.setProperty("--shift-x", sx);
+    this._face.style.setProperty("--shift-y", sy);
     this._face.setAttribute("aria-label", wordsToText(words, layoutOf(this._config).grid));
     this._applyNight();
   }
@@ -1147,7 +1244,7 @@ class ClockInLettersCardEditor extends HTMLElement {
     this._form.hass = this._hass;
     this._form.schema = SCHEMA;
     const data = withTheme(this._config);
-    for (const key of ["color_on", "color_off", "background", "fullscreen_background"]) data[key] = toRgb(data[key]);
+    for (const key of ["color_on", "color_off", "background", "fullscreen_background", "alert_color"]) data[key] = toRgb(data[key]);
     if (typeof data.padding === "string") data.padding = parseFloat(data.padding) || DEFAULTS.padding;
     this._form.data = data;
   }
@@ -1158,6 +1255,13 @@ function sameValue(a, b) {
 }
 
 const LABELS = {
+  transition: "Übergang beim Minutenwechsel",
+  burn_in_protection: "Schutz vor Einbrennen (Dauerbetrieb)",
+  presence_entity: "Anwesenheit (aus = dimmen), z. B. Bewegungsmelder",
+  color_entity: "Farbe von Lampe übernehmen",
+  alert_entities: "Alarm-Entitäten (aktiv = Alarmfarbe)",
+  alert_color: "Alarmfarbe",
+  alert_pulse: "Bei Alarm pulsieren",
   time_zone: "Zeitzone",
   sync_server_time: "Uhr mit dem HA-Server abgleichen",
   night_mode: "Nachtmodus",
@@ -1321,6 +1425,40 @@ const SCHEMA = [
         ],
       },
       { name: "padding", selector: slider(0, 20) },
+      {
+        name: "transition",
+        selector: {
+          select: {
+            mode: "dropdown",
+            options: [
+              { value: "cascade", label: "Buchstabe für Buchstabe" },
+              { value: "fade", label: "Alle gleichzeitig überblenden" },
+              { value: "none", label: "Sofort umschalten" },
+            ],
+          },
+        },
+      },
+      { name: "burn_in_protection", selector: { boolean: {} } },
+    ],
+  },
+  {
+    type: "expandable",
+    name: "homeassistant",
+    flatten: true,
+    title: "Home Assistant",
+    icon: "mdi:home-assistant",
+    schema: [
+      { name: "color_entity", selector: { entity: { domain: "light" } } },
+      { name: "alert_entities", selector: { entity: { multiple: true } } },
+      {
+        type: "grid",
+        name: "",
+        schema: [
+          { name: "alert_color", selector: { color_rgb: {} } },
+          { name: "alert_pulse", selector: { boolean: {} } },
+        ],
+      },
+      { name: "presence_entity", selector: { entity: {} } },
     ],
   },
   {
@@ -1478,4 +1616,4 @@ console.info(
   "color: #fff; background: #111;"
 );
 
-if (typeof module !== "undefined") module.exports = { wallClock, parseTime, inTimeWindow, GRID_EN, computeWords, wordsToText, toCss, toRgb, resolveFont, withTheme, THEMES };
+if (typeof module !== "undefined") module.exports = { hsToRgb, isActive, wallClock, parseTime, inTimeWindow, GRID_EN, computeWords, wordsToText, toCss, toRgb, resolveFont, withTheme, THEMES };

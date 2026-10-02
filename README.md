@@ -103,6 +103,20 @@ night_hide_unlit: true   # nachts nur die leuchtenden Buchstaben
 - `entity` – dunkel, solange eine Entität „an“ ist, z. B. `night_entity: input_boolean.nachtmodus`.
   So lässt sich der Nachtmodus mit Automationen, Bewegungsmeldern oder Szenen steuern.
 
+## Home Assistant einbinden
+
+```yaml
+type: custom:clockinletters-card
+color_entity: light.wohnzimmer          # Buchstaben in der Farbe der Lampe (wenn sie an ist)
+alert_entities:                         # ist eine davon aktiv, leuchtet die Uhr rot und pulsiert
+  - binary_sensor.haustuer
+  - alarm_control_panel.haus
+presence_entity: binary_sensor.bewegung_flur   # keine Bewegung -> gedimmt wie nachts
+```
+
+Als „aktiv“ gelten u. a. die Zustände `on`, `open`, `triggered`, `pending`, `unlocked`,
+`detected` und `home`.
+
 ## Uhrzeit
 
 - Die Uhr zeigt die Zeit in der Zeitzone, die in deinem **HA-Benutzerprofil** eingestellt ist
@@ -142,6 +156,13 @@ wall_mount: true
 | `night_entity`  | –                 | Entität für `night_mode: entity` (an = Nacht) |
 | `night_brightness` | `35`           | Helligkeit nachts in % |
 | `night_hide_unlit` | `false`        | Nachts nur die leuchtenden Buchstaben zeigen |
+| `presence_entity` | –               | Anwesenheit/Bewegung: ist sie aus, wird gedimmt wie nachts |
+| `color_entity`  | –                 | Licht-Entität: leuchtende Buchstaben übernehmen deren Farbe |
+| `alert_entities` | –                | Liste von Entitäten: ist eine aktiv, leuchtet die Uhr in `alert_color` |
+| `alert_color`   | `[255, 45, 45]`   | Farbe bei Alarm |
+| `alert_pulse`   | `true`            | Bei Alarm pulsieren |
+| `transition`    | `cascade`         | Minutenwechsel: `cascade` (Buchstabe für Buchstabe), `fade`, `none` |
+| `burn_in_protection` | `false`      | Uhr jede Minute minimal verschieben (Dauerbetrieb, OLED) |
 | `time_zone`     | `auto`            | `auto` (wie im HA-Profil), `server` oder `local` |
 | `sync_server_time` | `true`         | Geräte-Uhr mit der Uhr des HA-Servers abgleichen |
 | `font_family`   | `Barlow`          | Schriftart: `Barlow` (DIN-ähnlich, Google Fonts), `Helvetica Neue`, `Roboto`, `Arial`, `Verdana`, `Trebuchet MS`, `Georgia`, `Times New Roman`, `Courier New` oder eine Google-Schrift (`Barlow`, `Josefin Sans`, `Montserrat`, `Raleway`, `Poppins`, `Oswald`, `Quicksand`, `Comfortaa`, `Orbitron`, `Playfair Display`, `Roboto Mono`). Auch jeder andere CSS-Schriftname ist möglich. |
