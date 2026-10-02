@@ -5,7 +5,7 @@
  * plus vier Eck-Punkte für die Minuten zwischen den 5-Minuten-Schritten.
  */
 
-const CARD_VERSION = "1.8.0";
+const CARD_VERSION = "1.9.0";
 
 const GRID = [
   "ESKISTAFÜNF",
@@ -80,6 +80,14 @@ const DEFAULTS = {
   double_tap_action: "info", // dasselbe für Doppeltippen
   info_entities: [], // Werte, die bei "info" angezeigt werden (z. B. Temperatur)
   info_duration: 8, // Sekunden, bis wieder die Uhr erscheint
+  // Größe & Position
+  custom_size: false, // false: quadratisch und automatisch – true: Breite/Höhe frei
+  width: 100,
+  width_unit: "%", // % (der Kartenbreite) oder px
+  height: 100,
+  height_unit: "vh", // vh (% der Bildschirmhöhe) oder px
+  offset_x: 0, // Verschiebung nach rechts in px (negativ = links)
+  offset_y: 0, // Verschiebung nach unten in px (negativ = oben)
   fullscreen_background: [0, 0, 0], // Hintergrund im Vollbild
   keep_awake: true, // Bildschirm im Vollbild nicht ausschalten (wenn der Browser es unterstützt)
   // Uhrzeit
@@ -1086,6 +1094,20 @@ class ClockInLettersCard extends HTMLElement {
     const fit = c.fit_screen !== false;
     const framed = wall || view3d;
     const fsBg = toCss(c.fullscreen_background, DEFAULTS.fullscreen_background);
+    // Freie Größe: Breite (X) und Höhe (Y) in % / px bzw. % Bildschirmhöhe / px
+    const custom = !!c.custom_size;
+    const sizeW = custom
+      ? c.width_unit === "px"
+        ? `${clamp(c.width, 50, 8000, 400)}px`
+        : `${clamp(c.width, 5, 100, 100)}%`
+      : "";
+    const sizeH = custom
+      ? c.height_unit === "px"
+        ? `${clamp(c.height, 50, 8000, 400)}px`
+        : `${clamp(c.height, 5, 100, 100)}vh`
+      : "";
+    const offX = clamp(c.offset_x, -4000, 4000, 0);
+    const offY = clamp(c.offset_y, -4000, 4000, 0);
 
     const letters = layout.grid
       .map(
@@ -1130,17 +1152,31 @@ class ClockInLettersCard extends HTMLElement {
         }
         .wrap {
           box-sizing: border-box;
+          position: relative;
           padding: ${framed ? "8%" : "0"};
           margin: 0 auto;
           ${view3d ? "perspective: 1400px;" : ""}
+          ${offX || offY ? `left: ${offX}px; top: ${offY}px;` : ""}
+          ${custom ? `width: ${sizeW}; max-width: 100%;` : ""}
           /* Nie höher als der sichtbare Bildschirm (Kopfzeile von HA abgezogen) */
           ${
-            fit
+            fit && !custom
               ? `max-width: calc(100vh - var(--header-height, 56px) - 24px);
                  max-width: calc(100dvh - var(--header-height, 56px) - 24px);`
               : ""
           }
         }
+        ${
+          custom
+            ? `
+        /* Freie Höhe: Uhr ist nicht mehr quadratisch, die Buchstaben verteilen sich */
+        .face {
+          aspect-ratio: auto;
+          height: ${c.height_unit === "px" ? sizeH : `calc(${sizeH} - (var(--header-height, 56px) + 16px) * ${clamp(c.height, 5, 100, 100) / 100})`};
+        }`
+            : ""
+        }
+        ${offX || offY ? "ha-card { overflow: visible; }" : ""}
         ${
           fit && !framed
             ? `
@@ -1233,18 +1269,21 @@ class ClockInLettersCard extends HTMLElement {
           overflow: visible;
         }
         :host(.fs) .wrap {
-          width: min(94vw, 94vh);
-          width: min(94vw, 94dvh);
+          width: ${custom ? "94vw" : "min(94vw, 94vh)"};
+          ${custom ? "" : "width: min(94vw, 94dvh);"}
           max-width: none;
+          left: 0;
+          top: 0;
           padding: ${framed ? "4%" : "0"};
         }
+        ${custom ? ":host(.fs) .face { height: 94vh; height: 94dvh; }" : ""}
         :host(.fs) .face {
           border-radius: calc(0.4 * var(--u, 1cqi));
           ${framed ? "" : "box-shadow: 0 0 calc(6 * var(--u, 1cqi)) rgba(0, 0, 0, 0.5);"}
         }
         .face {
           position: relative;
-          aspect-ratio: 1 / 1;
+          aspect-ratio: ${custom ? "auto" : "1 / 1"};
           width: 100%;
           container-type: inline-size;
           box-sizing: border-box;
@@ -1402,13 +1441,15 @@ class ClockInLettersCard extends HTMLElement {
   /** --u = 1 % der Uhrbreite in px; alle Größen hängen daran (ohne Container-Queries). */
   _observeSize() {
     const face = this._face;
-    const apply = (w) => {
-      if (w > 0) face.style.setProperty("--u", `${w / 100}px`);
+    // Bei freier Größe zählt die kürzere Seite, damit die Schrift immer passt
+    const apply = (w, h) => {
+      const side = h > 0 ? Math.min(w, h) : w;
+      if (side > 0) face.style.setProperty("--u", `${side / 100}px`);
     };
-    apply(face.offsetWidth);
+    apply(face.offsetWidth, face.offsetHeight);
     if (this._ro) this._ro.disconnect();
     if (window.ResizeObserver) {
-      this._ro = new ResizeObserver((entries) => apply(entries[0].contentRect.width));
+      this._ro = new ResizeObserver((entries) => apply(entries[0].contentRect.width, entries[0].contentRect.height));
       this._ro.observe(face);
     }
   }
@@ -1480,6 +1521,10 @@ class ClockInLettersCardEditor extends HTMLElement {
       this._form.computeLabel = (s) => s.title || LABELS[s.name] || s.name;
       this._form.addEventListener("value-changed", (ev) => {
         const config = { ...ev.detail.value };
+        // Einheit gewechselt: sinnvollen Startwert setzen (100 % ≠ 100 px)
+        const prev = withTheme(this._config);
+        if (config.width_unit !== prev.width_unit) config.width = config.width_unit === "px" ? 600 : 100;
+        if (config.height_unit !== prev.height_unit) config.height = config.height_unit === "px" ? 600 : 100;
         const prevTheme = (this._config && this._config.theme) || DEFAULTS.theme;
         const theme = THEMES[config.theme];
         if (config.theme !== prevTheme && theme) {
@@ -1500,8 +1545,8 @@ class ClockInLettersCardEditor extends HTMLElement {
       this.appendChild(this._form);
     }
     this._form.hass = this._hass;
-    this._form.schema = SCHEMA;
     const data = withTheme(this._config);
+    this._form.schema = buildSchema(data);
     for (const key of ["color_on", "color_off", "background", "fullscreen_background", "alert_color"]) data[key] = toRgb(data[key]);
     if (typeof data.padding === "string") data.padding = parseFloat(data.padding) || DEFAULTS.padding;
     this._form.data = data;
@@ -1513,6 +1558,13 @@ function sameValue(a, b) {
 }
 
 const LABELS = {
+  custom_size: "Breite und Höhe frei einstellen",
+  width: "Breite (X)",
+  width_unit: "Einheit Breite",
+  height: "Höhe (Y)",
+  height_unit: "Einheit Höhe",
+  offset_x: "Verschieben X (links/rechts)",
+  offset_y: "Verschieben Y (oben/unten)",
   transition: "Übergang beim Minutenwechsel",
   burn_in_protection: "Schutz vor Einbrennen (Dauerbetrieb)",
   presence_entity: "Anwesenheit (aus = dimmen), z. B. Bewegungsmelder",
@@ -1558,6 +1610,62 @@ const LABELS = {
   dialect: "Viertel-Schreibweise",
   zwanzig: "20 / 40 Minuten",
 };
+
+/** Größe & Position: Regler passen sich der gewählten Einheit an */
+function sizeSection(data) {
+  const num = (min, max, unit, mode) => ({ number: { min, max, step: 1, mode, unit_of_measurement: unit } });
+  const unitSelect = (options) => ({ select: { mode: "dropdown", options } });
+  const schema = [{ name: "custom_size", selector: { boolean: {} } }];
+  if (data.custom_size) {
+    schema.push(
+      {
+        type: "grid",
+        name: "",
+        schema: [
+          {
+            name: "width",
+            selector: data.width_unit === "px" ? num(50, 4000, "px", "box") : num(5, 100, "%", "slider"),
+          },
+          {
+            name: "width_unit",
+            selector: unitSelect([
+              { value: "%", label: "% der Kartenbreite (Regler)" },
+              { value: "px", label: "Pixel" },
+            ]),
+          },
+          {
+            name: "height",
+            selector: data.height_unit === "px" ? num(50, 4000, "px", "box") : num(5, 100, "%", "slider"),
+          },
+          {
+            name: "height_unit",
+            selector: unitSelect([
+              { value: "vh", label: "% der Bildschirmhöhe (Regler)" },
+              { value: "px", label: "Pixel" },
+            ]),
+          },
+        ],
+      }
+    );
+  }
+  schema.push(
+    { name: "offset_x", selector: num(-1000, 1000, "px", "slider") },
+    { name: "offset_y", selector: num(-1000, 1000, "px", "slider") }
+  );
+  return {
+    type: "expandable",
+    name: "groesse",
+    flatten: true,
+    title: "Größe & Position",
+    icon: "mdi:arrow-expand-all",
+    schema,
+  };
+}
+
+function buildSchema(data) {
+  const i = SCHEMA.findIndex((s) => s.name === "bildschirm");
+  return [...SCHEMA.slice(0, i), sizeSection(data), ...SCHEMA.slice(i)];
+}
 
 const slider = (min, max, step = 1) => ({
   number: { min, max, step, mode: "slider", unit_of_measurement: "%" },

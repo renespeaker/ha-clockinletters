@@ -2,6 +2,11 @@
 
 Alle Versionen der Karte „Clock in Letters“. Die neueste steht oben.
 
+## [1.9.0] – 2026-10-02
+
+- Größe & Position: Breite (X) und Höhe (Y) frei einstellbar – per Schieberegler in %
+  oder in Pixeln; Uhr in X/Y verschiebbar. Mit 100 % × 100 % füllt sie den ganzen Bildschirm
+
 ## [1.8.0] – 2026-10-02
 
 - Neue Sprachen: Niederländisch, Französisch, Spanisch

@@ -103,6 +103,27 @@ night_hide_unlit: true   # nachts nur die leuchtenden Buchstaben
 - `entity` – dunkel, solange eine Entität „an“ ist, z. B. `night_entity: input_boolean.nachtmodus`.
   So lässt sich der Nachtmodus mit Automationen, Bewegungsmeldern oder Szenen steuern.
 
+## Größe & Position
+
+Normalerweise ist die Uhr quadratisch und passt sich automatisch an. Im Menü
+**Größe & Position** lassen sich Breite (X) und Höhe (Y) frei einstellen – per
+Schieberegler in % oder per Pixel – und die Uhr verschieben:
+
+```yaml
+type: custom:clockinletters-card
+custom_size: true
+width: 100          # Breite
+width_unit: "%"     # % der Kartenbreite oder px
+height: 100         # Höhe
+height_unit: vh     # % der Bildschirmhöhe (unter der HA-Kopfzeile) oder px
+offset_x: 0         # Verschiebung in px nach rechts (negativ = links)
+offset_y: 0         # Verschiebung in px nach unten (negativ = oben)
+```
+
+Mit `width: 100` / `height: 100` füllt die Uhr den ganzen Bildschirm, die Buchstaben
+verteilen sich über die volle Fläche. Die Schriftgröße richtet sich nach der kürzeren
+Seite. Im Vollbild füllt eine frei eingestellte Uhr den ganzen Bildschirm.
+
 ## Antippen: Vollbild und Info-Anzeige
 
 - **Antippen** schaltet das Vollbild ein/aus (`tap_action: fullscreen`)
@@ -180,6 +201,10 @@ wall_mount: true
 | `alert_pulse`   | `true`            | Bei Alarm pulsieren |
 | `transition`    | `cascade`         | Minutenwechsel: `cascade` (Buchstabe für Buchstabe), `fade`, `none` |
 | `burn_in_protection` | `false`      | Uhr jede Minute minimal verschieben (Dauerbetrieb, OLED) |
+| `custom_size`   | `false`           | Breite und Höhe frei einstellen |
+| `width` / `width_unit` | `100` / `%` | Breite in `%` (der Karte) oder `px` |
+| `height` / `height_unit` | `100` / `vh` | Höhe in `vh` (% der Bildschirmhöhe) oder `px` |
+| `offset_x` / `offset_y` | `0` / `0` | Verschiebung in px |
 | `time_zone`     | `auto`            | `auto` (wie im HA-Profil), `server` oder `local` |
 | `sync_server_time` | `true`         | Geräte-Uhr mit der Uhr des HA-Servers abgleichen |
 | `font_family`   | `Barlow`          | Schriftart: `Barlow` (DIN-ähnlich, Google Fonts), `Helvetica Neue`, `Roboto`, `Arial`, `Verdana`, `Trebuchet MS`, `Georgia`, `Times New Roman`, `Courier New` oder eine Google-Schrift (`Barlow`, `Josefin Sans`, `Montserrat`, `Raleway`, `Poppins`, `Oswald`, `Quicksand`, `Comfortaa`, `Orbitron`, `Playfair Display`, `Roboto Mono`). Auch jeder andere CSS-Schriftname ist möglich. |
