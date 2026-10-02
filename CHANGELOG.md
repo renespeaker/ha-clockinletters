@@ -2,6 +2,12 @@
 
 Alle Versionen der Karte „Clock in Letters“. Die neueste steht oben.
 
+## [1.14.0] – 2026-10-03
+
+- „Bildschirm füllen“: neue Einstellung „Immer die ganze Fläche füllen“, die ohne
+  Panel-Erkennung funktioniert; die automatische Erkennung prüft mehrfach nach
+- Versionsnummer oben im Karten-Menü
+
 ## [1.13.0] – 2026-10-03
 
 - In einer Panel-Ansicht füllt die Uhr automatisch die ganze Fläche unter der

@@ -77,7 +77,8 @@ wachsen mit.
 **Tipp für ein Wand-Tablet oder einen Monitor:** Eine eigene Dashboard-Ansicht
 vom Typ **Panel (einzelne Karte)** anlegen und nur diese Karte hineinlegen. Die Karte
 erkennt die Panel-Ansicht und füllt automatisch die ganze Fläche unter der
-HA-Kopfzeile – randlos, auf jedem Bildschirmformat (abschaltbar mit `panel_fill: false`):
+HA-Kopfzeile – randlos, auf jedem Bildschirmformat. Mit `panel_fill: always` füllt die Uhr
+die Fläche in jeder Ansicht, mit `panel_fill: off` bleibt sie quadratisch:
 
 ```yaml
 views:
@@ -322,7 +323,7 @@ wall_mount: true
 | `occasion_color` | –                | Eigene Farbe für Anlässe (Hex, RGB, RAL) |
 | `message_entity` | –                | Entität, deren Text als Nachricht erscheint (z. B. `input_text`) |
 | `message_duration` | `30`           | Sekunden; `0` = solange die Entität Text hat |
-| `panel_fill`    | `true`            | In einer Panel-Ansicht den ganzen Bildschirm füllen |
+| `panel_fill`    | `auto`            | Bildschirm füllen: `auto` (in Panel-Ansicht), `always` (immer), `off` (quadratisch) |
 | `custom_size`   | `false`           | Breite und Höhe frei einstellen |
 | `width` / `width_unit` | `100` / `%` | Breite in `%` (der Karte) oder `px` |
 | `height` / `height_unit` | `100` / `vh` | Höhe in `vh` (% der Bildschirmhöhe) oder `px` |
@@ -362,6 +363,12 @@ und werden in HACS als Update angezeigt. Was sich geändert hat, steht in der
    Karten-Datei automatisch an
 
 Tests lokal ausführen: `node tests/time.test.js`
+
+## Welche Version läuft?
+
+Oben im Karten-Menü steht die geladene Version („Clock in Letters – Version …“). Zeigt
+sie nach einem Update noch die alte Nummer, den Browser-Cache leeren bzw. in der
+Companion-App „Frontend-Cache zurücksetzen“.
 
 ## Vorschau ohne Home Assistant
 
