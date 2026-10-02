@@ -5,7 +5,7 @@
  * plus vier Eck-Punkte für die Minuten zwischen den 5-Minuten-Schritten.
  */
 
-const CARD_VERSION = "1.5.2";
+const CARD_VERSION = "1.6.0";
 
 const GRID = [
   "ESKISTAFÜNF",
@@ -79,6 +79,16 @@ const DEFAULTS = {
   tap_action: "fullscreen", // fullscreen: Antippen schaltet Vollbild um – none: nichts
   fullscreen_background: [0, 0, 0], // Hintergrund im Vollbild
   keep_awake: true, // Bildschirm im Vollbild nicht ausschalten (wenn der Browser es unterstützt)
+  // Uhrzeit
+  time_zone: "auto", // auto: wie im HA-Benutzerprofil – server: Zeitzone von HA – local: Zeitzone des Geräts
+  sync_server_time: true, // falsch gehende Geräte-Uhr mit der Uhr des HA-Servers abgleichen
+  // Nachtmodus
+  night_mode: "off", // off, sun (nach Sonnenuntergang), time (Zeitfenster), entity (Entität ist "on")
+  night_start: "22:00",
+  night_end: "06:30",
+  night_entity: "",
+  night_brightness: 35, // Helligkeit nachts in %
+  night_hide_unlit: false, // nachts nur die leuchtenden Buchstaben zeigen
 };
 
 // Farb-Vorlagen: setzen Farben, Deckkraft und Leucht-Effekt.
@@ -300,6 +310,40 @@ function toRgb(value) {
   return value;
 }
 
+/** Stunden/Minuten/Sekunden einer Zeit in einer bestimmten Zeitzone (null = Gerät). */
+const _tzFormats = {};
+function wallClock(date, timeZone) {
+  if (!timeZone) return { h: date.getHours(), m: date.getMinutes(), s: date.getSeconds() };
+  try {
+    const fmt =
+      _tzFormats[timeZone] ||
+      (_tzFormats[timeZone] = new Intl.DateTimeFormat("en-GB", {
+        timeZone,
+        hour: "numeric",
+        minute: "numeric",
+        second: "numeric",
+        hourCycle: "h23",
+      }));
+    const parts = {};
+    for (const p of fmt.formatToParts(date)) parts[p.type] = p.value;
+    return { h: Number(parts.hour) % 24, m: Number(parts.minute), s: Number(parts.second) };
+  } catch (e) {
+    return { h: date.getHours(), m: date.getMinutes(), s: date.getSeconds() }; // unbekannte Zeitzone
+  }
+}
+
+/** "22:00" / "22:00:00" -> Minuten seit Mitternacht */
+function parseTime(value, fallback) {
+  const m = String(value || "").match(/^(\d{1,2}):(\d{2})/);
+  return m ? (Number(m[1]) % 24) * 60 + Number(m[2]) : fallback;
+}
+
+/** Liegt die Minute des Tages im Nachtfenster? (Fenster darf über Mitternacht gehen) */
+function inTimeWindow(minuteOfDay, start, end) {
+  if (start === end) return false;
+  return start < end ? minuteOfDay >= start && minuteOfDay < end : minuteOfDay >= start || minuteOfDay < end;
+}
+
 /* Farben in JS mischen statt mit CSS color-mix() – das können ältere Browser
    (z. B. Kiosk-Browser auf Wandmonitoren, Chrome < 111) nicht. */
 const rgb = (c) => `rgb(${c.map(Math.round).join(", ")})`;
@@ -504,6 +548,18 @@ class ClockInLettersCard extends HTMLElement {
       this._themeKey = key;
       if (changed && this.isConnected) this._render();
     }
+    // Zeitzone geändert (z. B. HA-Daten kommen erst nach dem Anzeigen): sofort neu zeichnen
+    const tz = this._timeZone();
+    if (tz !== this._lastTz) {
+      this._lastTz = tz;
+      if (this._built) this._update();
+    }
+    // Nachtmodus nach Sonne/Entität sofort nachführen
+    if (this._built) this._applyNight();
+    if (!this._synced && hass) {
+      this._synced = true;
+      this._syncServerTime();
+    }
   }
 
   getCardSize() {
@@ -536,6 +592,7 @@ class ClockInLettersCard extends HTMLElement {
         if (document.visibilityState === "visible") {
           this._update();
           this._schedule();
+          this._syncServerTime();
           if (this._fs) this._requestWakeLock();
         }
       };
@@ -554,6 +611,8 @@ class ClockInLettersCard extends HTMLElement {
       this._ro.disconnect();
       this._ro = null;
     }
+    clearTimeout(this._syncTimer);
+    this._synced = false;
     if (this._listening) {
       this._listening = false;
       this.removeEventListener("click", this._onClick);
@@ -613,10 +672,94 @@ class ClockInLettersCard extends HTMLElement {
     }
   }
 
+  /** Aktuelle Zeit: Geräte-Uhr + Abgleich mit dem Server */
+  _nowMs() {
+    return Date.now() + (this._offset || 0);
+  }
+
+  /** Zeitzone, in der die Uhr anzeigen soll (null = Gerät) */
+  _timeZone() {
+    const c = this._config || {};
+    const hass = this._hass;
+    const serverTz = hass && hass.config && hass.config.time_zone;
+    if (c.time_zone === "server") return serverTz || null;
+    if (c.time_zone === "local") return null;
+    // auto: Einstellung im HA-Benutzerprofil (Zeitzone: Server oder lokal)
+    return hass && hass.locale && hass.locale.time_zone === "server" ? serverTz || null : null;
+  }
+
+  /** Wanduhrzeit als Date (nur Stunde/Minute zählen) */
+  _now() {
+    const { h, m, s } = wallClock(new Date(this._nowMs()), this._timeZone());
+    return new Date(2000, 0, 1, h, m, s);
+  }
+
+  /**
+   * Abweichung der Geräte-Uhr bestimmen: Der HA-Server schickt bei jeder Antwort
+   * seine Uhrzeit im HTTP-Header "Date" mit. Wird stündlich wiederholt.
+   */
+  async _syncServerTime() {
+    clearTimeout(this._syncTimer);
+    this._syncTimer = setTimeout(() => this._syncServerTime(), 60 * 60 * 1000);
+    if (!this._config || this._config.sync_server_time === false || !window.fetch) {
+      this._offset = 0;
+      return;
+    }
+    try {
+      const t0 = Date.now();
+      const res = await fetch("/manifest.json", { method: "HEAD", cache: "no-store" });
+      const t1 = Date.now();
+      const header = res.headers.get("date");
+      if (!header) return;
+      // Header hat nur Sekunden-Genauigkeit -> im Mittel +500 ms
+      const offset = Date.parse(header) + 500 - (t0 + t1) / 2;
+      if (!Number.isFinite(offset)) return;
+      const previous = this._offset || 0;
+      // Kleine Abweichungen ignorieren (Messungenauigkeit)
+      this._offset = Math.abs(offset) > 3000 ? Math.round(offset) : 0;
+      if (this._offset !== previous) {
+        this._update();
+        this._schedule();
+      }
+    } catch (e) {
+      // z. B. Vorschau ohne Home Assistant – dann Geräte-Uhr
+    }
+  }
+
+  _isNight() {
+    const c = this._config || {};
+    const hass = this._hass;
+    switch (c.night_mode) {
+      case "sun": {
+        const sun = hass && hass.states && hass.states["sun.sun"];
+        return !!sun && sun.state === "below_horizon";
+      }
+      case "time": {
+        const now = this._now();
+        const minute = now.getHours() * 60 + now.getMinutes();
+        return inTimeWindow(minute, parseTime(c.night_start, 22 * 60), parseTime(c.night_end, 6 * 60 + 30));
+      }
+      case "entity": {
+        const st = c.night_entity && hass && hass.states && hass.states[c.night_entity];
+        return !!st && ["on", "true", "below_horizon", "night"].includes(String(st.state).toLowerCase());
+      }
+      default:
+        return false;
+    }
+  }
+
+  _applyNight() {
+    if (!this._face) return;
+    const night = this._isNight();
+    if (night !== this._night) {
+      this._night = night;
+      this._face.classList.toggle("night", night);
+    }
+  }
+
   _schedule() {
     clearTimeout(this._timer);
-    const now = new Date();
-    const ms = (60 - now.getSeconds()) * 1000 - now.getMilliseconds() + 50;
+    const ms = 60000 - (this._nowMs() % 60000) + 50;
     this._timer = setTimeout(() => {
       this._update();
       this._schedule();
@@ -721,6 +864,24 @@ class ClockInLettersCard extends HTMLElement {
         .face {
           border-radius: ${c.rounded ? "var(--ha-card-border-radius, 12px)" : "0"};
           overflow: hidden;
+        }`
+            : ""
+        }
+        /* Nachtmodus: Uhr gedimmt, auf Wunsch nur die leuchtenden Buchstaben */
+        .face {
+          transition: filter 3s ease;
+        }
+        .face.night {
+          filter: brightness(${clamp(c.night_brightness, 5, 100, DEFAULTS.night_brightness) / 100});
+        }
+        ${
+          c.night_hide_unlit
+            ? `.face.night .l:not(.on),
+        .face.night .dot:not(.on) {
+          color: transparent;
+          text-shadow: none;
+          background: transparent;
+          box-shadow: none;
         }`
             : ""
         }
@@ -899,6 +1060,7 @@ class ClockInLettersCard extends HTMLElement {
     this._dots = [...this.shadowRoot.querySelectorAll(".dot")];
     this._face = this.shadowRoot.querySelector(".face");
     this._observeSize();
+    this._night = undefined;
     this._built = true;
     this._update();
   }
@@ -934,7 +1096,7 @@ class ClockInLettersCard extends HTMLElement {
 
   _update() {
     if (!this._built) return;
-    const { words, dots } = computeWords(new Date(), this._config);
+    const { words, dots } = computeWords(this._now(), this._config);
     const lit = new Set();
     for (const [r, c, l] of words) {
       for (let i = c; i < c + l; i++) lit.add(r * 11 + i);
@@ -942,6 +1104,7 @@ class ClockInLettersCard extends HTMLElement {
     this._cells.forEach((el, idx) => el.classList.toggle("on", lit.has(idx)));
     this._dots.forEach((el, idx) => el.classList.toggle("on", idx < dots));
     this._face.setAttribute("aria-label", wordsToText(words, layoutOf(this._config).grid));
+    this._applyNight();
   }
 }
 
@@ -995,6 +1158,14 @@ function sameValue(a, b) {
 }
 
 const LABELS = {
+  time_zone: "Zeitzone",
+  sync_server_time: "Uhr mit dem HA-Server abgleichen",
+  night_mode: "Nachtmodus",
+  night_start: "Nacht beginnt um",
+  night_end: "Nacht endet um",
+  night_entity: "Entität für Nacht (an = Nacht)",
+  night_brightness: "Helligkeit nachts (%)",
+  night_hide_unlit: "Nachts nur leuchtende Buchstaben",
   theme: "Farb-Vorlage",
   font_family: "Schriftart",
   font_size: "Schriftgröße (%)",
@@ -1154,6 +1325,63 @@ const SCHEMA = [
   },
   {
     type: "expandable",
+    name: "nacht",
+    flatten: true,
+    title: "Nachtmodus",
+    icon: "mdi:weather-night",
+    schema: [
+      {
+        name: "night_mode",
+        selector: {
+          select: {
+            mode: "dropdown",
+            options: [
+              { value: "off", label: "Aus" },
+              { value: "sun", label: "Nach Sonnenuntergang (sun.sun)" },
+              { value: "time", label: "Feste Uhrzeiten" },
+              { value: "entity", label: "Nach Entität (z. B. input_boolean)" },
+            ],
+          },
+        },
+      },
+      {
+        type: "grid",
+        name: "",
+        schema: [
+          { name: "night_start", selector: { time: {} } },
+          { name: "night_end", selector: { time: {} } },
+        ],
+      },
+      { name: "night_entity", selector: { entity: {} } },
+      { name: "night_brightness", selector: slider(5, 100) },
+      { name: "night_hide_unlit", selector: { boolean: {} } },
+    ],
+  },
+  {
+    type: "expandable",
+    name: "zeit",
+    flatten: true,
+    title: "Uhrzeit",
+    icon: "mdi:clock-check-outline",
+    schema: [
+      {
+        name: "time_zone",
+        selector: {
+          select: {
+            mode: "dropdown",
+            options: [
+              { value: "auto", label: "Wie im HA-Profil eingestellt" },
+              { value: "server", label: "Zeitzone des HA-Servers" },
+              { value: "local", label: "Zeitzone dieses Geräts" },
+            ],
+          },
+        },
+      },
+      { name: "sync_server_time", selector: { boolean: {} } },
+    ],
+  },
+  {
+    type: "expandable",
     name: "bildschirm",
     flatten: true,
     title: "Bildschirm & Vollbild",
@@ -1250,4 +1478,4 @@ console.info(
   "color: #fff; background: #111;"
 );
 
-if (typeof module !== "undefined") module.exports = { GRID_EN, computeWords, wordsToText, toCss, toRgb, resolveFont, withTheme, THEMES };
+if (typeof module !== "undefined") module.exports = { wallClock, parseTime, inTimeWindow, GRID_EN, computeWords, wordsToText, toCss, toRgb, resolveFont, withTheme, THEMES };

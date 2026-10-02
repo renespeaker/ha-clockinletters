@@ -2,6 +2,13 @@
 
 Alle Versionen der Karte „Clock in Letters“. Die neueste steht oben.
 
+## [1.6.0] – 2026-10-02
+
+- Nachtmodus: dimmt nach Sonnenuntergang, in einem festen Zeitfenster oder über eine
+  Entität; wahlweise nur die leuchtenden Buchstaben
+- Uhrzeit in der Zeitzone aus dem HA-Benutzerprofil (oder fest Server/Gerät)
+- Falsch gehende Geräte-Uhren werden automatisch mit dem HA-Server abgeglichen
+
 ## [1.5.2] – 2026-10-02
 
 - Versionen erscheinen jetzt als Releases und werden in HACS als Update angezeigt

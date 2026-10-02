@@ -87,6 +87,31 @@ views:
         theme: oliv
 ```
 
+## Nachtmodus
+
+Nachts dimmt die Uhr automatisch – im Menü **Nachtmodus** oder per YAML:
+
+```yaml
+type: custom:clockinletters-card
+night_mode: sun          # off, sun, time oder entity
+night_brightness: 30     # Helligkeit nachts in %
+night_hide_unlit: true   # nachts nur die leuchtenden Buchstaben
+```
+
+- `sun` – dunkel, solange die Sonne untergegangen ist (`sun.sun`)
+- `time` – festes Zeitfenster, z. B. `night_start: "22:00"` und `night_end: "06:30"`
+- `entity` – dunkel, solange eine Entität „an“ ist, z. B. `night_entity: input_boolean.nachtmodus`.
+  So lässt sich der Nachtmodus mit Automationen, Bewegungsmeldern oder Szenen steuern.
+
+## Uhrzeit
+
+- Die Uhr zeigt die Zeit in der Zeitzone, die in deinem **HA-Benutzerprofil** eingestellt ist
+  (`time_zone: auto`). Mit `time_zone: server` immer in der Zeitzone des HA-Servers,
+  mit `time_zone: local` in der des Geräts.
+- Geht die Uhr des Geräts falsch (z. B. Kiosk-Tablet oder Raspberry Pi ohne Internetzeit),
+  gleicht die Karte sie automatisch mit der Uhr des HA-Servers ab – stündlich und nach dem
+  Aufwachen aus dem Standby (`sync_server_time`, Standard an).
+
 ## Farb-Vorlagen
 
 ![Farb-Vorlagen](https://raw.githubusercontent.com/renespeaker/ha-clockinletters/main/images/themes.png)
@@ -112,6 +137,13 @@ wall_mount: true
 | `tap_action`    | `fullscreen`      | Beim Antippen: `fullscreen` (Vollbild ein/aus) oder `none` |
 | `fullscreen_background` | `[0, 0, 0]` | Hintergrund im Vollbild |
 | `keep_awake`    | `true`            | Bildschirm im Vollbild wach halten |
+| `night_mode`    | `off`             | Nachtmodus: `off`, `sun`, `time`, `entity` |
+| `night_start` / `night_end` | `22:00` / `06:30` | Zeitfenster für `night_mode: time` |
+| `night_entity`  | –                 | Entität für `night_mode: entity` (an = Nacht) |
+| `night_brightness` | `35`           | Helligkeit nachts in % |
+| `night_hide_unlit` | `false`        | Nachts nur die leuchtenden Buchstaben zeigen |
+| `time_zone`     | `auto`            | `auto` (wie im HA-Profil), `server` oder `local` |
+| `sync_server_time` | `true`         | Geräte-Uhr mit der Uhr des HA-Servers abgleichen |
 | `font_family`   | `Barlow`          | Schriftart: `Barlow` (DIN-ähnlich, Google Fonts), `Helvetica Neue`, `Roboto`, `Arial`, `Verdana`, `Trebuchet MS`, `Georgia`, `Times New Roman`, `Courier New` oder eine Google-Schrift (`Barlow`, `Josefin Sans`, `Montserrat`, `Raleway`, `Poppins`, `Oswald`, `Quicksand`, `Comfortaa`, `Orbitron`, `Playfair Display`, `Roboto Mono`). Auch jeder andere CSS-Schriftname ist möglich. |
 | `font_size`     | `85`              | Schriftgröße in % (50–130) |
 | `font_weight`   | `"400"`           | Schriftstärke `"100"` (hauchdünn) bis `"900"` (extra fett) |

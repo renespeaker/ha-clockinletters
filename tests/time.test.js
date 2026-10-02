@@ -8,7 +8,7 @@ global.window = {};
 global.document = { getElementById: () => null };
 console.info = () => {};
 
-const { computeWords, wordsToText, GRID_EN } = require("../clockinletters-card.js");
+const { computeWords, wordsToText, GRID_EN, wallClock, parseTime, inTimeWindow } = require("../clockinletters-card.js");
 
 const de = (h, m, cfg = {}) =>
   wordsToText(computeWords(new Date(2026, 0, 1, h, m), { show_es_ist: true, dialect: "west", zwanzig: "zwanzig", ...cfg }).words);
@@ -53,4 +53,26 @@ for (let m = 0; m < 24 * 60; m++) {
   }
 }
 
-console.log(`OK – ${cases.length} Uhrzeiten und alle 1440 Minuten geprüft`);
+// Zeitzonen: 12:00 UTC
+const noonUtc = new Date(Date.UTC(2026, 0, 15, 12, 0, 0));
+assert.deepStrictEqual(wallClock(noonUtc, "Europe/Berlin"), { h: 13, m: 0, s: 0 }); // Winterzeit
+assert.deepStrictEqual(wallClock(new Date(Date.UTC(2026, 6, 15, 12, 0, 0)), "Europe/Berlin"), { h: 14, m: 0, s: 0 }); // Sommerzeit
+assert.deepStrictEqual(wallClock(noonUtc, "America/New_York"), { h: 7, m: 0, s: 0 });
+assert.deepStrictEqual(wallClock(new Date(Date.UTC(2026, 0, 15, 23, 30, 0)), "Europe/Berlin"), { h: 0, m: 30, s: 0 }); // Mitternacht = 0, nicht 24
+assert.strictEqual(wallClock(noonUtc, "Kein/Gueltig").h, noonUtc.getHours()); // unbekannte Zone -> Gerät
+
+// Nacht-Zeitfenster
+assert.strictEqual(parseTime("22:00:00"), 22 * 60);
+assert.strictEqual(parseTime("6:30"), 6 * 60 + 30);
+assert.strictEqual(parseTime("", 99), 99);
+const night = (hhmm) => inTimeWindow(parseTime(hhmm), parseTime("22:00"), parseTime("06:30"));
+assert.strictEqual(night("23:15"), true);
+assert.strictEqual(night("00:00"), true);
+assert.strictEqual(night("06:29"), true);
+assert.strictEqual(night("06:30"), false);
+assert.strictEqual(night("12:00"), false);
+assert.strictEqual(night("21:59"), false);
+assert.strictEqual(inTimeWindow(parseTime("14:00"), parseTime("13:00"), parseTime("15:00")), true); // Fenster am Tag
+assert.strictEqual(inTimeWindow(parseTime("14:00"), parseTime("13:00"), parseTime("13:00")), false); // leeres Fenster
+
+console.log(`OK – ${cases.length} Uhrzeiten, alle 1440 Minuten, Zeitzonen und Nachtfenster geprüft`);
