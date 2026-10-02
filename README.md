@@ -149,3 +149,7 @@ Tests lokal ausführen: `node tests/time.test.js`
 ## Vorschau ohne Home Assistant
 
 `preview.html` im Browser öffnen.
+
+## Lizenz
+
+MIT – siehe [LICENSE](LICENSE).
