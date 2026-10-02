@@ -27,4 +27,5 @@ jobs:
         with:
           category: plugin
           # Nicht nötig für ein benutzerdefiniertes Repository
-          ignore: brands topics description
+          # license: entfällt, solange keine Lizenz gewählt ist
+          ignore: brands topics description license

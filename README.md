@@ -4,7 +4,7 @@ Eine Lovelace-Karte als Wortuhr: Die Uhrzeit wird in leuchtenden
 deutschen oder englischen Wörtern in einem 11×10-Buchstabenraster angezeigt. Vier Punkte in den
 Ecken zeigen die Minuten zwischen den 5-Minuten-Schritten an.
 
-![Screenshot](images/screenshot.png)
+![Screenshot](https://raw.githubusercontent.com/renespeaker/ha-clockinletters/main/images/screenshot.png)
 
 *(Oliv auf Englisch an der Wand, Walnuss auf Deutsch und Kupfer in 3D-Ansicht)*
 
@@ -89,7 +89,7 @@ views:
 
 ## Farb-Vorlagen
 
-![Farb-Vorlagen](images/themes.png)
+![Farb-Vorlagen](https://raw.githubusercontent.com/renespeaker/ha-clockinletters/main/images/themes.png)
 
 ```yaml
 type: custom:clockinletters-card
