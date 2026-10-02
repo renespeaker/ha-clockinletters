@@ -1,7 +1,7 @@
 # Clock in Letters – Wortuhr für Home Assistant
 
 Eine Lovelace-Karte als Wortuhr: Die Uhrzeit wird in leuchtenden
-deutschen oder englischen Wörtern in einem 11×10-Buchstabenraster angezeigt. Vier Punkte in den
+Wörtern – auf Deutsch, Englisch, Niederländisch, Französisch oder Spanisch in einem 11×10-Buchstabenraster angezeigt. Vier Punkte in den
 Ecken zeigen die Minuten zwischen den 5-Minuten-Schritten an.
 
 ![Screenshot](https://raw.githubusercontent.com/renespeaker/ha-clockinletters/main/images/screenshot.png)
@@ -103,6 +103,20 @@ night_hide_unlit: true   # nachts nur die leuchtenden Buchstaben
 - `entity` – dunkel, solange eine Entität „an“ ist, z. B. `night_entity: input_boolean.nachtmodus`.
   So lässt sich der Nachtmodus mit Automationen, Bewegungsmeldern oder Szenen steuern.
 
+## Antippen: Vollbild und Info-Anzeige
+
+- **Antippen** schaltet das Vollbild ein/aus (`tap_action: fullscreen`)
+- **Doppeltippen** zeigt für ein paar Sekunden Wochentag, Datum und frei wählbare Werte
+  im Stil der Uhr (`double_tap_action: info`)
+
+```yaml
+type: custom:clockinletters-card
+info_entities:
+  - sensor.aussentemperatur
+  - sensor.luftfeuchte_wohnzimmer
+info_duration: 8
+```
+
 ## Home Assistant einbinden
 
 ```yaml
@@ -146,9 +160,12 @@ wall_mount: true
 | `wall_mount`    | `false`           | Uhr hängt mit Schatten auf der Karte wie an der Wand (Kartenhintergrund = Wand) |
 | `view_3d`       | `false`           | Schräge 3D-Ansicht mit sichtbarer Plattenkante |
 | `stencil`       | `true`            | Stege in O, Ö, Q, D wie bei ausgefrästen Buchstaben |
-| `language`      | `de`              | Sprache des Buchstabenrasters: `de` oder `en` |
+| `language`      | `de`              | Sprache des Buchstabenrasters: `de`, `en`, `nl`, `fr`, `es` |
 | `fit_screen`    | `true`            | Uhr nie höher als der Bildschirm (quadratisch, zentriert) |
-| `tap_action`    | `fullscreen`      | Beim Antippen: `fullscreen` (Vollbild ein/aus) oder `none` |
+| `tap_action`    | `fullscreen`      | Beim Antippen: `fullscreen`, `info` oder `none` |
+| `double_tap_action` | `info`        | Beim Doppeltippen: `info`, `fullscreen` oder `none` |
+| `info_entities` | –                 | Werte für die Info-Anzeige, z. B. Temperatur |
+| `info_duration` | `8`               | Sekunden, bis wieder die Uhr erscheint |
 | `fullscreen_background` | `[0, 0, 0]` | Hintergrund im Vollbild |
 | `keep_awake`    | `true`            | Bildschirm im Vollbild wach halten |
 | `night_mode`    | `off`             | Nachtmodus: `off`, `sun`, `time`, `entity` |

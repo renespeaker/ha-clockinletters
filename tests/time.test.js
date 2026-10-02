@@ -8,7 +8,7 @@ global.window = {};
 global.document = { getElementById: () => null };
 console.info = () => {};
 
-const { computeWords, wordsToText, GRID_EN, wallClock, parseTime, inTimeWindow, hsToRgb, isActive } = require("../clockinletters-card.js");
+const { computeWords, wordsToText, GRID_EN, LAYOUTS, wallClock, parseTime, inTimeWindow, hsToRgb, isActive } = require("../clockinletters-card.js");
 
 const de = (h, m, cfg = {}) =>
   wordsToText(computeWords(new Date(2026, 0, 1, h, m), { show_es_ist: true, dialect: "west", zwanzig: "zwanzig", ...cfg }).words);
@@ -45,9 +45,74 @@ const cases = [
 
 for (const [actual, expected] of cases) assert.strictEqual(actual, expected);
 
+// Weitere Sprachen
+const say = (lang, h, m) => {
+  const r = computeWords(new Date(2026, 0, 1, h, m), { show_es_ist: true, language: lang });
+  return wordsToText(r.words, LAYOUTS[lang].grid);
+};
+const more = [
+  ["nl", 2, 0, "HET IS TWEE UUR"],
+  ["nl", 2, 5, "HET IS VIJF OVER TWEE"],
+  ["nl", 2, 15, "HET IS KWART OVER TWEE"],
+  ["nl", 2, 20, "HET IS TIEN VOOR HALF DRIE"],
+  ["nl", 2, 25, "HET IS VIJF VOOR HALF DRIE"],
+  ["nl", 2, 30, "HET IS HALF DRIE"],
+  ["nl", 2, 35, "HET IS VIJF OVER HALF DRIE"],
+  ["nl", 2, 40, "HET IS TIEN OVER HALF DRIE"],
+  ["nl", 2, 45, "HET IS KWART VOOR DRIE"],
+  ["nl", 11, 55, "HET IS VIJF VOOR TWAALF"],
+  ["nl", 0, 0, "HET IS TWAALF UUR"],
+  ["fr", 1, 0, "IL EST UNE HEURE"],
+  ["fr", 2, 0, "IL EST DEUX HEURES"],
+  ["fr", 2, 5, "IL EST DEUX HEURES CINQ"],
+  ["fr", 2, 15, "IL EST DEUX HEURES ET QUART"],
+  ["fr", 2, 25, "IL EST DEUX HEURES VINGT-CINQ"],
+  ["fr", 2, 30, "IL EST DEUX HEURES ET DEMIE"],
+  ["fr", 2, 35, "IL EST TROIS HEURES MOINS VINGT-CINQ"],
+  ["fr", 2, 45, "IL EST TROIS HEURES MOINS LE QUART"],
+  ["fr", 2, 50, "IL EST TROIS HEURES MOINS DIX"],
+  ["fr", 12, 0, "IL EST MIDI"],
+  ["fr", 12, 30, "IL EST MIDI ET DEMI"],
+  ["fr", 11, 45, "IL EST MIDI MOINS LE QUART"],
+  ["fr", 0, 10, "IL EST MINUIT DIX"],
+  ["fr", 23, 55, "IL EST MINUIT MOINS CINQ"],
+  ["fr", 13, 0, "IL EST UNE HEURE"],
+  ["fr", 9, 0, "IL EST NEUF HEURES"],
+  ["fr", 10, 5, "IL EST DIX HEURES CINQ"],
+  ["fr", 5, 10, "IL EST CINQ HEURES DIX"],
+  ["es", 1, 0, "ES LA UNA"],
+  ["es", 2, 0, "SON LAS DOS"],
+  ["es", 2, 5, "SON LAS DOS Y CINCO"],
+  ["es", 2, 15, "SON LAS DOS Y CUARTO"],
+  ["es", 2, 25, "SON LAS DOS Y VEINTICINCO"],
+  ["es", 2, 30, "SON LAS DOS Y MEDIA"],
+  ["es", 2, 35, "SON LAS TRES MENOS VEINTICINCO"],
+  ["es", 0, 45, "ES LA UNA MENOS CUARTO"],
+  ["es", 12, 40, "ES LA UNA MENOS VEINTE"],
+  ["es", 11, 50, "SON LAS DOCE MENOS DIEZ"],
+  ["es", 10, 10, "SON LAS DIEZ Y DIEZ"],
+];
+for (const [lang, h, m, expected] of more) assert.strictEqual(say(lang, h, m), expected, `${lang} ${h}:${m}`);
+
+// Raster: 10 Zeilen à 11 Buchstaben, alle Wörter liegen im Raster und in Lesereihenfolge
+for (const [lang, layout] of Object.entries(LAYOUTS)) {
+  assert.strictEqual(layout.grid.length, 10, lang);
+  for (const row of layout.grid) assert.strictEqual([...row].length, 11, `${lang}: ${row}`);
+  for (let m = 0; m < 24 * 60; m++) {
+    const { words } = computeWords(new Date(2026, 0, 1, Math.floor(m / 60), m % 60), { show_es_ist: true, language: lang });
+    let last = -1;
+    for (const [r, c, l] of words) {
+      assert.ok(r >= 0 && r < 10 && c >= 0 && c + l <= 11, `${lang} ${m}: Wort außerhalb`);
+      const pos = r * 11 + c;
+      assert.ok(pos > last, `${lang} ${Math.floor(m / 60)}:${m % 60}: Wörter nicht in Lesereihenfolge`);
+      last = pos + l - 1;
+    }
+  }
+}
+
 // Jede Minute des Tages muss ohne Fehler eine Uhrzeit liefern
 for (let m = 0; m < 24 * 60; m++) {
-  for (const language of ["de", "en"]) {
+  for (const language of Object.keys(LAYOUTS)) {
     const r = computeWords(new Date(2026, 0, 1, Math.floor(m / 60), m % 60), { show_es_ist: true, language });
     assert.ok(r.words.length >= 3 && r.words.every((w) => w.length === 3));
   }

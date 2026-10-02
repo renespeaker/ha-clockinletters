@@ -2,6 +2,12 @@
 
 Alle Versionen der Karte „Clock in Letters“. Die neueste steht oben.
 
+## [1.8.0] – 2026-10-02
+
+- Neue Sprachen: Niederländisch, Französisch, Spanisch
+- Doppeltippen zeigt Wochentag, Datum und frei wählbare Werte (z. B. Außentemperatur)
+- Antippen/Doppeltippen frei belegbar (Vollbild, Info, nichts)
+
 ## [1.7.0] – 2026-10-02
 
 - Minutenwechsel Buchstabe für Buchstabe (wählbar: Kaskade, Überblenden, sofort)

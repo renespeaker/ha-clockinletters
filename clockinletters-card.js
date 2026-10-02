@@ -5,7 +5,7 @@
  * plus vier Eck-Punkte für die Minuten zwischen den 5-Minuten-Schritten.
  */
 
-const CARD_VERSION = "1.7.0";
+const CARD_VERSION = "1.8.0";
 
 const GRID = [
   "ESKISTAFÜNF",
@@ -76,7 +76,10 @@ const DEFAULTS = {
   view_3d: false, // schräge Ansicht mit sichtbarer Plattenkante
   stencil: true, // Stege in O, Ö, Q, D wie bei ausgefrästen Buchstaben
   fit_screen: true, // Uhr nie höher als der Bildschirm (wichtig bei Panel-Ansicht / großen Monitoren)
-  tap_action: "fullscreen", // fullscreen: Antippen schaltet Vollbild um – none: nichts
+  tap_action: "fullscreen", // fullscreen: Vollbild ein/aus – info: Datum & Werte zeigen – none: nichts
+  double_tap_action: "info", // dasselbe für Doppeltippen
+  info_entities: [], // Werte, die bei "info" angezeigt werden (z. B. Temperatur)
+  info_duration: 8, // Sekunden, bis wieder die Uhr erscheint
   fullscreen_background: [0, 0, 0], // Hintergrund im Vollbild
   keep_awake: true, // Bildschirm im Vollbild nicht ausschalten (wenn der Browser es unterstützt)
   // Uhrzeit
@@ -454,9 +457,165 @@ function computeWordsEn(date, cfg) {
   return { words, dots: minute % 5 };
 }
 
+// ---------- Niederländisch ----------
+const GRID_NL = [
+  "HETKISAVIJF",
+  "TIENZKWARTA",
+  "VOOROVERZTP",
+  "HALFEENTWEE",
+  "DRIEVIERZES",
+  "VIJFRZEVENT",
+  "ACHTNEGENLA",
+  "TIENSELFMOR",
+  "TWAALFBXUUR",
+  "GOEDEMORGEN",
+];
+const W_NL = {
+  HET: [0, 0, 3], IS: [0, 4, 2], VIJF: [0, 7, 4], TIEN: [1, 0, 4], KWART: [1, 5, 5],
+  VOOR: [2, 0, 4], OVER: [2, 4, 4], HALF: [3, 0, 4], UUR: [8, 8, 3],
+};
+const HOURS_NL = [
+  [8, 0, 6], [3, 4, 3], [3, 7, 4], [4, 0, 4], [4, 4, 4], [5, 0, 4],
+  [4, 8, 3], [5, 5, 5], [6, 0, 4], [6, 4, 5], [7, 0, 4], [7, 5, 3],
+]; // TWAALF EEN TWEE DRIE VIER VIJF ZES ZEVEN ACHT NEGEN TIEN ELF
+
+function computeWordsNl(date, cfg) {
+  const minute = date.getMinutes();
+  const step = Math.floor(minute / 5);
+  const w = W_NL;
+  const words = cfg.show_es_ist ? [w.HET, w.IS] : [];
+  words.push(
+    ...[
+      [],
+      [w.VIJF, w.OVER],
+      [w.TIEN, w.OVER],
+      [w.KWART, w.OVER],
+      [w.TIEN, w.VOOR, w.HALF],
+      [w.VIJF, w.VOOR, w.HALF],
+      [w.HALF],
+      [w.VIJF, w.OVER, w.HALF],
+      [w.TIEN, w.OVER, w.HALF],
+      [w.KWART, w.VOOR],
+      [w.TIEN, w.VOOR],
+      [w.VIJF, w.VOOR],
+    ][step]
+  );
+  const hour = (date.getHours() + (step >= 4 ? 1 : 0)) % 12;
+  words.push(HOURS_NL[hour]);
+  if (step === 0) words.push(w.UUR);
+  return { words, dots: minute % 5 };
+}
+
+// ---------- Französisch ----------
+const GRID_FR = [
+  "ILNESTODEUX",
+  "QUATRETROIS",
+  "NEUFUNESEPT",
+  "HUITSIXCINQ",
+  "MIDIXMINUIT",
+  "ONZERHEURES",
+  "MOINSOLEDIX",
+  "ETRQUARTPMD",
+  "VINGT-CINQU",
+  "ETSDEMIEPAM",
+];
+const W_FR = {
+  IL: [0, 0, 2], EST: [0, 3, 3], MIDI: [4, 0, 4], MINUIT: [4, 5, 6], HEURE: [5, 5, 5], HEURES: [5, 5, 6],
+  MOINS: [6, 0, 5], LE: [6, 6, 2], DIX: [6, 8, 3], ET_QUART: [7, 0, 2], QUART: [7, 3, 5],
+  VINGT: [8, 0, 5], VINGT_CINQ: [8, 0, 10], CINQ: [8, 6, 4], ET_DEMIE: [9, 0, 2], DEMIE: [9, 3, 5], DEMI: [9, 3, 4],
+};
+const HOURS_FR = [
+  null, [2, 4, 3], [0, 7, 4], [1, 6, 5], [1, 0, 6], [3, 7, 4],
+  [3, 4, 3], [2, 7, 4], [3, 0, 4], [2, 0, 4], [4, 2, 3], [5, 0, 4],
+]; // – UNE DEUX TROIS QUATRE CINQ SIX SEPT HUIT NEUF DIX ONZE
+
+function computeWordsFr(date, cfg) {
+  const minute = date.getMinutes();
+  const step = Math.floor(minute / 5);
+  const w = W_FR;
+  const words = cfg.show_es_ist ? [w.IL, w.EST] : [];
+  const hour24 = (date.getHours() + (step > 6 ? 1 : 0)) % 24;
+  const noonOrMidnight = hour24 % 12 === 0;
+  if (hour24 === 0) words.push(w.MINUIT);
+  else if (hour24 === 12) words.push(w.MIDI);
+  else {
+    const h = hour24 % 12;
+    words.push(HOURS_FR[h], h === 1 ? w.HEURE : w.HEURES);
+  }
+  words.push(
+    ...[
+      [],
+      [w.CINQ],
+      [w.DIX],
+      [w.ET_QUART, w.QUART],
+      [w.VINGT],
+      [w.VINGT_CINQ],
+      [w.ET_DEMIE, noonOrMidnight ? w.DEMI : w.DEMIE], // midi et demi, une heure et demie
+      [w.MOINS, w.VINGT_CINQ],
+      [w.MOINS, w.VINGT],
+      [w.MOINS, w.LE, w.QUART],
+      [w.MOINS, w.DIX],
+      [w.MOINS, w.CINQ],
+    ][step]
+  );
+  return { words, dots: minute % 5 };
+}
+
+// ---------- Spanisch ----------
+const GRID_ES = [
+  "ESONELASUNA",
+  "DOSITRESAMB",
+  "CUATROCINCO",
+  "SEISASIETEN",
+  "OCHONUEVEPM",
+  "DIEZONCERDA",
+  "DOCELYMENOS",
+  "VEINTICINCO",
+  "VEINTEDIEZA",
+  "CUARTOMEDIA",
+];
+const W_ES = {
+  ES: [0, 0, 2], SON: [0, 1, 3], LA: [0, 5, 2], LAS: [0, 5, 3], Y: [6, 5, 1], MENOS: [6, 6, 5],
+  VEINTICINCO: [7, 0, 11], CINCO: [7, 6, 5], VEINTE: [8, 0, 6], DIEZ: [8, 6, 4], CUARTO: [9, 0, 6], MEDIA: [9, 6, 5],
+};
+const HOURS_ES = [
+  [6, 0, 4], [0, 8, 3], [1, 0, 3], [1, 4, 4], [2, 0, 6], [2, 6, 5],
+  [3, 0, 4], [3, 5, 5], [4, 0, 4], [4, 4, 5], [5, 0, 4], [5, 4, 4],
+]; // DOCE UNA DOS TRES CUATRO CINCO SEIS SIETE OCHO NUEVE DIEZ ONCE
+
+function computeWordsEs(date, cfg) {
+  const minute = date.getMinutes();
+  const step = Math.floor(minute / 5);
+  const w = W_ES;
+  const hour = (date.getHours() + (step > 6 ? 1 : 0)) % 12;
+  const words = [];
+  if (cfg.show_es_ist) words.push(...(hour === 1 ? [w.ES, w.LA] : [w.SON, w.LAS]));
+  words.push(HOURS_ES[hour]);
+  words.push(
+    ...[
+      [],
+      [w.Y, w.CINCO],
+      [w.Y, w.DIEZ],
+      [w.Y, w.CUARTO],
+      [w.Y, w.VEINTE],
+      [w.Y, w.VEINTICINCO],
+      [w.Y, w.MEDIA],
+      [w.MENOS, w.VEINTICINCO],
+      [w.MENOS, w.VEINTE],
+      [w.MENOS, w.CUARTO],
+      [w.MENOS, w.DIEZ],
+      [w.MENOS, w.CINCO],
+    ][step]
+  );
+  return { words, dots: minute % 5 };
+}
+
 const LAYOUTS = {
-  de: { grid: GRID, compute: computeWordsDe },
-  en: { grid: GRID_EN, compute: computeWordsEn },
+  de: { grid: GRID, compute: computeWordsDe, locale: "de-DE" },
+  en: { grid: GRID_EN, compute: computeWordsEn, locale: "en-GB" },
+  nl: { grid: GRID_NL, compute: computeWordsNl, locale: "nl-NL" },
+  fr: { grid: GRID_FR, compute: computeWordsFr, locale: "fr-FR" },
+  es: { grid: GRID_ES, compute: computeWordsEs, locale: "es-ES" },
 };
 
 function layoutOf(cfg) {
@@ -612,9 +771,22 @@ class ClockInLettersCard extends HTMLElement {
     if (!this._listening) {
       this._listening = true;
       this._onClick = () => {
-        // Im Dashboard-Editor kein Vollbild auslösen
-        if (this.preview || this.editMode) return;
-        if ((this._config && this._config.tap_action) === "fullscreen") this._toggleFullscreen();
+        // Im Dashboard-Editor nichts auslösen
+        if (this.preview || this.editMode || !this._config) return;
+        const tap = this._config.tap_action || "none";
+        const dbl = this._config.double_tap_action || "none";
+        if (dbl === "none") return this._runAction(tap);
+        // Doppeltippen erkennen: einfaches Tippen wartet kurz
+        if (this._tapTimer) {
+          clearTimeout(this._tapTimer);
+          this._tapTimer = null;
+          this._runAction(dbl);
+        } else {
+          this._tapTimer = setTimeout(() => {
+            this._tapTimer = null;
+            this._runAction(tap);
+          }, 280);
+        }
       };
       this._onKey = (ev) => {
         if (ev.key === "Escape" && this._fs) this._exitFullscreen();
@@ -658,6 +830,62 @@ class ClockInLettersCard extends HTMLElement {
       document.removeEventListener("visibilitychange", this._onVisible);
     }
     if (this._fs) this._exitFullscreen();
+  }
+
+  _runAction(action) {
+    if (action === "fullscreen") this._toggleFullscreen();
+    else if (action === "info") this._toggleInfo();
+  }
+
+  /** Datum und ausgewählte Werte für ein paar Sekunden statt der Uhr zeigen */
+  _toggleInfo(show = !this._infoShown) {
+    clearTimeout(this._infoTimer);
+    this._infoShown = show;
+    if (!this._face) return;
+    if (show) {
+      this._fillInfo();
+      const seconds = clamp(this._config.info_duration, 2, 120, DEFAULTS.info_duration);
+      this._infoTimer = setTimeout(() => this._toggleInfo(false), seconds * 1000);
+    }
+    this._face.classList.toggle("show-info", show);
+  }
+
+  _fillInfo() {
+    const box = this.shadowRoot && this.shadowRoot.querySelector(".info");
+    if (!box) return;
+    const c = this._config;
+    const locale = layoutOf(c).locale;
+    const tz = this._timeZone();
+    const date = new Date(this._nowMs());
+    const fmt = (opts) => {
+      try {
+        return new Intl.DateTimeFormat(locale, tz ? { ...opts, timeZone: tz } : opts).format(date);
+      } catch (e) {
+        return new Intl.DateTimeFormat(locale, opts).format(date);
+      }
+    };
+    const esc = (t) => String(t).replace(/[&<>"]/g, (ch) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[ch]);
+    const lines = [
+      `<div class="i-main">${esc(fmt({ weekday: "long" }))}</div>`,
+      `<div class="i-sub">${esc(fmt({ day: "numeric", month: "long" }))}</div>`,
+    ];
+    const states = (this._hass && this._hass.states) || {};
+    const ids = Array.isArray(c.info_entities) ? c.info_entities : c.info_entities ? [c.info_entities] : [];
+    for (const id of ids) {
+      const st = states[id];
+      if (!st) continue;
+      const name = (st.attributes && st.attributes.friendly_name) || id;
+      let value;
+      if (this._hass && typeof this._hass.formatEntityState === "function") {
+        value = this._hass.formatEntityState(st);
+      } else {
+        const unit = (st.attributes && st.attributes.unit_of_measurement) || "";
+        const num = Number(st.state);
+        value = (Number.isFinite(num) && st.state !== "" ? num.toLocaleString(locale, { maximumFractionDigits: 1 }) : st.state) + (unit ? ` ${unit}` : "");
+      }
+      lines.push(`<div class="i-name">${esc(name)}</div><div class="i-value">${esc(value)}</div>`);
+    }
+    box.innerHTML = lines.join("");
   }
 
   _toggleFullscreen() {
@@ -889,7 +1117,7 @@ class ClockInLettersCard extends HTMLElement {
       <style>
         :host {
           display: block;
-          ${c.tap_action === "fullscreen" ? "cursor: pointer;" : ""}
+          ${(c.tap_action && c.tap_action !== "none") || (c.double_tap_action && c.double_tap_action !== "none") ? "cursor: pointer; -webkit-tap-highlight-color: transparent;" : ""}
           --ct-on: ${on};
           --ct-off: ${off};
           --ct-bg: ${bg};
@@ -929,6 +1157,31 @@ class ClockInLettersCard extends HTMLElement {
         }`
             : ""
         }
+        /* Info-Anzeige (Datum, Werte) statt der Uhr */
+        .info {
+          position: absolute;
+          inset: ${padding};
+          z-index: 1;
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          justify-content: center;
+          text-align: center;
+          font-family: ${resolveFont(c.font_family)};
+          font-weight: ${c.font_weight || DEFAULTS.font_weight};
+          text-transform: uppercase;
+          color: ${onLit};
+          ${glow ? `text-shadow: 0 0 ${glow * 0.3}em var(--ct-on);` : ""}
+          opacity: 0;
+          pointer-events: none;
+          transition: opacity 0.6s ease;
+        }
+        .info .i-main { font-size: calc(${fontSize * 1.2} * var(--u, 1cqi)); letter-spacing: 0.35em; margin-bottom: 0.4em; }
+        .info .i-sub { font-size: calc(${fontSize} * var(--u, 1cqi)); letter-spacing: 0.3em; margin-bottom: 1.6em; }
+        .info .i-name { font-size: calc(${fontSize * 0.5} * var(--u, 1cqi)); letter-spacing: 0.25em; color: var(--ct-off); text-shadow: none; margin-top: 1.2em; }
+        .info .i-value { font-size: calc(${fontSize * 1.1} * var(--u, 1cqi)); letter-spacing: 0.15em; text-transform: none; }
+        .face.show-info .grid { opacity: 0; }
+        .face.show-info .info { opacity: 1; }
         /* Alarm: leuchtende Buchstaben pulsieren */
         ${
           dynamic && dynamic.alert && c.alert_pulse !== false
@@ -1041,7 +1294,7 @@ class ClockInLettersCard extends HTMLElement {
           font-size: calc(${fontSize} * var(--u, 1cqi));
           line-height: 1;
           user-select: none;
-          transition: transform 2s ease;
+          transition: transform 2s ease, opacity 0.6s ease;
         }
         .row {
           display: flex;
@@ -1126,6 +1379,7 @@ class ClockInLettersCard extends HTMLElement {
           <div class="face" role="img">
             ${dots}
             <div class="grid">${letters}</div>
+            <div class="info" aria-live="polite"></div>
           </div>
         </div>
       </ha-card>
@@ -1135,6 +1389,10 @@ class ClockInLettersCard extends HTMLElement {
     this._dots = [...this.shadowRoot.querySelectorAll(".dot")];
     this._face = this.shadowRoot.querySelector(".face");
     this._observeSize();
+    if (this._infoShown) {
+      this._fillInfo();
+      this._face.classList.add("show-info");
+    }
     this._night = undefined;
     this._prevLit = undefined;
     this._built = true;
@@ -1290,6 +1548,9 @@ const LABELS = {
   language: "Sprache",
   fit_screen: "An Bildschirmhöhe anpassen",
   tap_action: "Beim Antippen",
+  double_tap_action: "Beim Doppeltippen",
+  info_entities: "Werte in der Info-Anzeige (z. B. Temperatur)",
+  info_duration: "Info-Anzeige wie lange",
   fullscreen_background: "Hintergrund im Vollbild",
   keep_awake: "Bildschirm im Vollbild wach halten",
   finish: "Oberfläche",
@@ -1532,11 +1793,27 @@ const SCHEMA = [
             mode: "dropdown",
             options: [
               { value: "fullscreen", label: "Vollbild ein/aus" },
+              { value: "info", label: "Datum & Werte zeigen" },
               { value: "none", label: "Nichts" },
             ],
           },
         },
       },
+      {
+        name: "double_tap_action",
+        selector: {
+          select: {
+            mode: "dropdown",
+            options: [
+              { value: "info", label: "Datum & Werte zeigen" },
+              { value: "fullscreen", label: "Vollbild ein/aus" },
+              { value: "none", label: "Nichts" },
+            ],
+          },
+        },
+      },
+      { name: "info_entities", selector: { entity: { multiple: true } } },
+      { name: "info_duration", selector: { number: { min: 3, max: 60, step: 1, mode: "slider", unit_of_measurement: "s" } } },
       { name: "fullscreen_background", selector: { color_rgb: {} } },
       {
         type: "grid",
@@ -1563,6 +1840,9 @@ const SCHEMA = [
             options: [
               { value: "de", label: "Deutsch" },
               { value: "en", label: "English" },
+              { value: "nl", label: "Nederlands" },
+              { value: "fr", label: "Français" },
+              { value: "es", label: "Español" },
             ],
           },
         },
@@ -1616,4 +1896,4 @@ console.info(
   "color: #fff; background: #111;"
 );
 
-if (typeof module !== "undefined") module.exports = { hsToRgb, isActive, wallClock, parseTime, inTimeWindow, GRID_EN, computeWords, wordsToText, toCss, toRgb, resolveFont, withTheme, THEMES };
+if (typeof module !== "undefined") module.exports = { LAYOUTS, hsToRgb, isActive, wallClock, parseTime, inTimeWindow, GRID_EN, computeWords, wordsToText, toCss, toRgb, resolveFont, withTheme, THEMES };
