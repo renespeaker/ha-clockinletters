@@ -5,7 +5,7 @@
  * plus vier Eck-Punkte für die Minuten zwischen den 5-Minuten-Schritten.
  */
 
-const CARD_VERSION = "1.9.0";
+const CARD_VERSION = "1.10.0";
 
 const GRID = [
   "ESKISTAFÜNF",
@@ -311,23 +311,95 @@ function loadGoogleFont(name) {
 /** [r, g, b] oder CSS-String -> CSS-Farbe */
 function toCss(value, fallback) {
   if (Array.isArray(value) && value.length >= 3) return `rgb(${value.slice(0, 3).join(", ")})`;
-  if (typeof value === "string" && value.trim()) return value;
+  if (typeof value === "string" && value.trim()) {
+    const code = parseColorCode(value);
+    return code ? `rgb(${code.join(", ")})` : value; // RAL/Hex/RGB-Code oder beliebiges CSS
+  }
   return toCss(fallback);
 }
 
-/** CSS-Farbe (#rgb, #rrggbb, rgb()) -> [r, g, b], sonst unverändert */
-function toRgb(value) {
-  if (typeof value !== "string") return value;
+/*
+ * RAL-Classic-Farben (Code + Hex), aus dem Paket "ral-colors" von Ibon Eskudero,
+ * MIT-Lizenz: https://github.com/ieskudero/ral-colors
+ * RAL-Farben lassen sich am Bildschirm nur annähernd darstellen.
+ */
+const RAL_CLASSIC = {};
+(
+  "1000CDBA88 1001D0B084 1002D2AA6D 1003F9A800 1004E49E00 1005CB8E00 1006E29000 1007E88C00 1011AF804F " +
+  "1012DDAF27 1013E3D9C6 1014DDC49A 1015E6D2B5 1016F1DD38 1017F6A950 1018FACA30 1019A48F7A 1020A08F65 " +
+  "1021F6B600 1023F7B500 1024BA8F4C 1026FFFF00 1027A77F0E 1028FF9B00 1032E2A300 1033F99A1C 1034EB9C52 " +
+  "1035908370 103680643F 1037F09200 2000DD7907 2001BE4E20 2002C63927 2003FA842B 2004E75B12 2005FF2300 " +
+  "2007FFA421 2008F3752C 2009E15501 2010D4652F 2011EC7C25 2012DB6A50 2013954527 2017FA4402 3000AB2524 " +
+  "3001A02128 3002A1232B 30038D1D2C 3004701F29 30055E2028 3007402225 3009703731 30117E292C 3012CB8D73 " +
+  "30139C322E 3014D47479 3015E1A6AD 3016AC4034 3017D3545F 3018D14152 3020C1121C 3022D56D56 3024F70000 " +
+  "3026FF0000 3027B42041 3028E72512 3031AC323B 3032711521 3033B24C43 40018A5A83 4002933D50 4003D15B8F " +
+  "4004691639 400583639D 4006992572 40074A203B 4008904684 4009A38995 4010C63678 40118773A1 40126B6880 " +
+  "5000384C70 50011F4764 50022B2C7C 50032A3756 50041D1F2A 5005154889 500741678D 5008313C48 50092E5978 " +
+  "501013447C 5011232C3F 50123481B8 5013232D53 50146C7C98 50152874B2 50170E518D 501821888F 50191A5784 " +
+  "50200B4151 502107737A 50222F2A5A 50234D668E 50246A93B0 5025296478 5026102C54 6000327662 600128713E " +
+  "6002276235 60034B573E 60040E4243 60050F4336 600640433B 6007283424 600835382E 600926392F 60103E753B " +
+  "601168825B 601231403D 6013797C5A 6014444337 60153D403A 6016026A52 6017468641 601848A43F 6019B7D9B1 " +
+  "6020354733 602186A47C 60223E3C32 6024008754 602553753C 6026005D52 602781C0BB 60282D5546 6029007243 " +
+  "60320F8558 6033478A84 60347FB0B2 60351B542C 6036005D4C 603725E712 603800F700 70007E8B92 70018F999F " +
+  "7002817F68 70037A7B6D 70049EA0A1 70056B716F 7006756F61 7008746643 70095B6259 7010575D57 7011555D61 " +
+  "7012596163 7013555548 701551565C 7016373F43 70212E3234 70224B4D46 7023818479 7024474A50 7026374447 " +
+  "7030939388 70315D6970 7032B9B9A8 7033818979 7034939176 7035CBD0CC 70369A9697 70377C7F7E 7038B4B8B0 " +
+  "70396B695F 70409DA3A6 70428F9695 70434E5451 7044BDBDB2 704591969A 704682898E 7047CFD0CF 7048888175 " +
+  "8000887142 80019C6B30 80027B5141 800380542F 80048F4E35 80076F4A2F 80086F4F28 80115A3A29 8012673831 " +
+  "801449392D 8015633A34 80164C2F26 801744322D 80193F3A3A 8022211F20 8023A65E2F 802479553C 8025755C49 " +
+  "80284E3B2B 8029773C27 9001EFEBDC 9002DDDED4 9003F4F8F4 90042E3032 90050A0A0D 9006A5A8A6 90078F8F8C " +
+  "9010F7F9EF 9011292C2F 9012FFFDE6 9016F7FBF5 90172A2D2F 9018CFD3CD 90229C9C9C 90237E8182"
+)
+  .split(" ")
+  .forEach((e) => (RAL_CLASSIC[e.slice(0, 4)] = e.slice(4)));
+
+/**
+ * Farbcode lesen: #RGB, #RRGGBB, RRGGBB, rgb(r, g, b), "r, g, b", "r g b",
+ * "RAL 6003" oder "6003". Liefert [r, g, b] oder null.
+ */
+function parseColorCode(value) {
+  if (typeof value !== "string") return null;
   const v = value.trim();
-  let m = v.match(/^#([0-9a-f]{3}|[0-9a-f]{6})$/i);
+  let m = v.match(/^#([0-9a-f]{3}|[0-9a-f]{6})$/i) || v.match(/^([0-9a-f]{6})$/i);
   if (m) {
     let h = m[1];
     if (h.length === 3) h = [...h].map((x) => x + x).join("");
     return [0, 2, 4].map((i) => parseInt(h.substr(i, 2), 16));
   }
-  m = v.match(/^rgba?\(\s*(\d+)[\s,]+(\d+)[\s,]+(\d+)/i);
-  if (m) return [+m[1], +m[2], +m[3]];
-  return value;
+  m = v.match(/^(?:ral)?[\s-]*(\d{4})$/i);
+  if (m) {
+    const hex = RAL_CLASSIC[m[1]];
+    return hex ? parseColorCode(`#${hex}`) : null;
+  }
+  m =
+    v.match(/^rgba?\(\s*(\d{1,3})[\s,]+(\d{1,3})[\s,]+(\d{1,3})/i) ||
+    v.match(/^(\d{1,3})\s*[,;\s]\s*(\d{1,3})\s*[,;\s]\s*(\d{1,3})$/);
+  if (m) {
+    const rgb = [+m[1], +m[2], +m[3]];
+    return rgb.every((n) => n <= 255) ? rgb : null;
+  }
+  return null;
+}
+
+/** Farbcode einheitlich schreiben: "RAL 6003", "#4B573E" oder [r, g, b] */
+function normalizeColorCode(value) {
+  const v = String(value).trim();
+  const ral = v.match(/^(?:ral)?[\s-]*(\d{4})$/i);
+  if (ral) return `RAL ${ral[1]}`;
+  if (/^#?[0-9a-f]{6}$/i.test(v) || /^#[0-9a-f]{3}$/i.test(v)) return (v.startsWith("#") ? v : `#${v}`).toUpperCase();
+  return parseColorCode(v);
+}
+
+/** Anzeige im Code-Feld: Text bleibt, wie er ist; [r, g, b] wird zu #RRGGBB */
+function colorCodeOf(value) {
+  if (Array.isArray(value)) return `#${value.slice(0, 3).map((n) => Math.round(n).toString(16).padStart(2, "0")).join("").toUpperCase()}`;
+  return typeof value === "string" ? value : "";
+}
+
+/** CSS-Farbe / Farbcode -> [r, g, b], sonst unverändert */
+function toRgb(value) {
+  if (typeof value !== "string") return value;
+  return parseColorCode(value) || value;
 }
 
 /** Stunden/Minuten/Sekunden einer Zeit in einer bestimmten Zeitzone (null = Gerät). */
@@ -1518,9 +1590,20 @@ class ClockInLettersCardEditor extends HTMLElement {
   _render() {
     if (!this._form) {
       this._form = document.createElement("ha-form");
-      this._form.computeLabel = (s) => s.title || LABELS[s.name] || s.name;
+      this._form.computeLabel = (s) => s.title || LABELS[s.name] || (s.name.endsWith("_code") ? "Farbcode" : s.name);
+      this._form.computeHelper = (s) =>
+        s.name && s.name.endsWith("_code") ? "Hex (#4B573E), RGB (75, 87, 62) oder RAL (RAL 6003)" : undefined;
       this._form.addEventListener("value-changed", (ev) => {
         const config = { ...ev.detail.value };
+        // Farbcode-Felder: gültiger Code ersetzt die Farbe, ungültiger (noch beim Tippen) wird ignoriert
+        for (const key of COLOR_KEYS) {
+          const code = config[`${key}_code`];
+          delete config[`${key}_code`];
+          if (code === undefined || code === (this._shownCodes || {})[key]) continue;
+          if (!String(code).trim()) continue;
+          if (!parseColorCode(String(code))) return; // unvollständig – weiter tippen lassen
+          config[key] = normalizeColorCode(code);
+        }
         // Einheit gewechselt: sinnvollen Startwert setzen (100 % ≠ 100 px)
         const prev = withTheme(this._config);
         if (config.width_unit !== prev.width_unit) config.width = config.width_unit === "px" ? 600 : 100;
@@ -1547,7 +1630,12 @@ class ClockInLettersCardEditor extends HTMLElement {
     this._form.hass = this._hass;
     const data = withTheme(this._config);
     this._form.schema = buildSchema(data);
-    for (const key of ["color_on", "color_off", "background", "fullscreen_background", "alert_color"]) data[key] = toRgb(data[key]);
+    this._shownCodes = {};
+    for (const key of COLOR_KEYS) {
+      this._shownCodes[key] = colorCodeOf(data[key]);
+      data[`${key}_code`] = this._shownCodes[key];
+      data[key] = toRgb(data[key]);
+    }
     if (typeof data.padding === "string") data.padding = parseFloat(data.padding) || DEFAULTS.padding;
     this._form.data = data;
   }
@@ -1662,9 +1750,28 @@ function sizeSection(data) {
   };
 }
 
+const COLOR_KEYS = ["color_on", "color_off", "background", "alert_color", "fullscreen_background"];
+
+/** Neben jeden Farbwähler ein Feld für Hex-, RGB- oder RAL-Code setzen */
+function withColorCodes(schema) {
+  return schema.flatMap((item) => {
+    if (item.schema) return [{ ...item, schema: withColorCodes(item.schema) }];
+    if (item.selector && item.selector.color_rgb && COLOR_KEYS.includes(item.name)) {
+      return [
+        {
+          type: "grid",
+          name: "",
+          schema: [item, { name: `${item.name}_code`, selector: { text: {} } }],
+        },
+      ];
+    }
+    return [item];
+  });
+}
+
 function buildSchema(data) {
   const i = SCHEMA.findIndex((s) => s.name === "bildschirm");
-  return [...SCHEMA.slice(0, i), sizeSection(data), ...SCHEMA.slice(i)];
+  return withColorCodes([...SCHEMA.slice(0, i), sizeSection(data), ...SCHEMA.slice(i)]);
 }
 
 const slider = (min, max, step = 1) => ({
@@ -2004,4 +2111,4 @@ console.info(
   "color: #fff; background: #111;"
 );
 
-if (typeof module !== "undefined") module.exports = { LAYOUTS, hsToRgb, isActive, wallClock, parseTime, inTimeWindow, GRID_EN, computeWords, wordsToText, toCss, toRgb, resolveFont, withTheme, THEMES };
+if (typeof module !== "undefined") module.exports = { parseColorCode, normalizeColorCode, colorCodeOf, RAL_CLASSIC, LAYOUTS, hsToRgb, isActive, wallClock, parseTime, inTimeWindow, GRID_EN, computeWords, wordsToText, toCss, toRgb, resolveFont, withTheme, THEMES };

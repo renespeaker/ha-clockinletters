@@ -8,7 +8,7 @@ global.window = {};
 global.document = { getElementById: () => null };
 console.info = () => {};
 
-const { computeWords, wordsToText, GRID_EN, LAYOUTS, wallClock, parseTime, inTimeWindow, hsToRgb, isActive } = require("../clockinletters-card.js");
+const { parseColorCode, normalizeColorCode, colorCodeOf, RAL_CLASSIC, computeWords, wordsToText, GRID_EN, LAYOUTS, wallClock, parseTime, inTimeWindow, hsToRgb, isActive } = require("../clockinletters-card.js");
 
 const de = (h, m, cfg = {}) =>
   wordsToText(computeWords(new Date(2026, 0, 1, h, m), { show_es_ist: true, dialect: "west", zwanzig: "zwanzig", ...cfg }).words);
@@ -148,4 +148,26 @@ assert.deepStrictEqual(hsToRgb(30, 0), [255, 255, 255]);
 for (const st of ["on", "open", "triggered", "unlocked", "home"]) assert.ok(isActive(st), st);
 for (const st of ["off", "closed", "disarmed", "locked", "not_home", "unavailable"]) assert.ok(!isActive(st), st);
 
-console.log(`OK – ${cases.length} Uhrzeiten, alle 1440 Minuten, Zeitzonen und Nachtfenster geprüft`);
+// Farbcodes: Hex, RGB, RAL
+assert.strictEqual(Object.keys(RAL_CLASSIC).length, 215);
+assert.deepStrictEqual(parseColorCode("#4B573E"), [75, 87, 62]);
+assert.deepStrictEqual(parseColorCode("#fff"), [255, 255, 255]);
+assert.deepStrictEqual(parseColorCode("4b573e"), [75, 87, 62]);
+assert.deepStrictEqual(parseColorCode("rgb(1, 2, 3)"), [1, 2, 3]);
+assert.deepStrictEqual(parseColorCode("76, 75, 45"), [76, 75, 45]);
+assert.deepStrictEqual(parseColorCode("76 75 45"), [76, 75, 45]);
+assert.deepStrictEqual(parseColorCode("76;75;45"), [76, 75, 45]);
+assert.deepStrictEqual(parseColorCode("RAL 6003"), [75, 87, 62]);
+assert.deepStrictEqual(parseColorCode("ral6003"), [75, 87, 62]);
+assert.deepStrictEqual(parseColorCode("RAL-9005"), [10, 10, 13]);
+assert.deepStrictEqual(parseColorCode("7016"), [55, 63, 67]);
+for (const bad of ["", "#12", "#12345", "RAL 1234", "300, 0, 0", "rot", "var(--primary-color)", "12,34"]) {
+  assert.strictEqual(parseColorCode(bad), null, bad);
+}
+assert.strictEqual(normalizeColorCode("ral 6003"), "RAL 6003");
+assert.strictEqual(normalizeColorCode("4b573e"), "#4B573E");
+assert.deepStrictEqual(normalizeColorCode("76, 75, 45"), [76, 75, 45]);
+assert.strictEqual(colorCodeOf([75, 87, 62]), "#4B573E");
+assert.strictEqual(colorCodeOf("RAL 6003"), "RAL 6003");
+
+console.log(`OK – ${cases.length} Uhrzeiten, alle 1440 Minuten, Zeitzonen, Nachtfenster und Farbcodes geprüft`);

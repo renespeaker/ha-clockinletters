@@ -2,6 +2,11 @@
 
 Alle Versionen der Karte „Clock in Letters“. Die neueste steht oben.
 
+## [1.10.0] – 2026-10-02
+
+- Farben per Code eingeben: Hex (`#4B573E`), RGB (`75, 87, 62`) oder RAL (`RAL 6003`) –
+  im Menü neben jedem Farbwähler oder direkt im YAML; alle 215 RAL-Classic-Farben
+
 ## [1.9.0] – 2026-10-02
 
 - Größe & Position: Breite (X) und Höhe (Y) frei einstellbar – per Schieberegler in %

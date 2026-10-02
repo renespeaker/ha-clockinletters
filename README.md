@@ -161,6 +161,22 @@ Als „aktiv“ gelten u. a. die Zustände `on`, `open`, `triggered`, `pending`,
   gleicht die Karte sie automatisch mit der Uhr des HA-Servers ab – stündlich und nach dem
   Aufwachen aus dem Standby (`sync_server_time`, Standard an).
 
+## Eigene Farben: Hex, RGB oder RAL
+
+Neben jedem Farbwähler gibt es ein Feld **Farbcode**. Dort – oder direkt im YAML –
+lässt sich jede Farbe als Hex-, RGB- oder RAL-Code eingeben:
+
+```yaml
+type: custom:clockinletters-card
+background: RAL 6003      # RAL Classic (auch "6003" oder "RAL-6003")
+color_on: "#F7F9EF"       # Hex (auch "#fff" oder "F7F9EF")
+color_off: 230, 228, 218  # RGB (auch "rgb(230, 228, 218)")
+off_opacity: 45
+```
+
+Alle 215 RAL-Classic-Farben sind enthalten. RAL-Farben sind für Lack definiert und
+lassen sich am Bildschirm nur annähernd darstellen.
+
 ## Farb-Vorlagen
 
 ![Farb-Vorlagen](https://raw.githubusercontent.com/renespeaker/ha-clockinletters/main/images/themes.png)
@@ -210,7 +226,7 @@ wall_mount: true
 | `font_family`   | `Barlow`          | Schriftart: `Barlow` (DIN-ähnlich, Google Fonts), `Helvetica Neue`, `Roboto`, `Arial`, `Verdana`, `Trebuchet MS`, `Georgia`, `Times New Roman`, `Courier New` oder eine Google-Schrift (`Barlow`, `Josefin Sans`, `Montserrat`, `Raleway`, `Poppins`, `Oswald`, `Quicksand`, `Comfortaa`, `Orbitron`, `Playfair Display`, `Roboto Mono`). Auch jeder andere CSS-Schriftname ist möglich. |
 | `font_size`     | `85`              | Schriftgröße in % (50–130) |
 | `font_weight`   | `"400"`           | Schriftstärke `"100"` (hauchdünn) bis `"900"` (extra fett) |
-| `color_on`      | `[255, 255, 255]` | Farbe der aktiven Buchstaben/Punkte – `[r, g, b]` oder CSS-Farbe (`"#ffcc00"`, `"var(--primary-color)"`) |
+| `color_on`      | `[255, 255, 255]` | Farbe der aktiven Buchstaben/Punkte – `[r, g, b]`, Hex, RGB, RAL (`RAL 9010`) oder CSS (`"var(--primary-color)"`) |
 | `color_off`     | `[255, 255, 255]` | Farbe der inaktiven Buchstaben |
 | `off_opacity`   | `15`              | Deckkraft der inaktiven Buchstaben in % |
 | `background`    | `[17, 17, 17]`    | Hintergrund – `[r, g, b]` oder CSS (auch `linear-gradient(...)`) |
@@ -248,3 +264,6 @@ Tests lokal ausführen: `node tests/time.test.js`
 ## Lizenz
 
 MIT – siehe [LICENSE](LICENSE).
+
+Die RAL-Classic-Farbwerte stammen aus dem Paket
+[ral-colors](https://github.com/ieskudero/ral-colors) von Ibon Eskudero (MIT-Lizenz).
