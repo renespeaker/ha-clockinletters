@@ -75,8 +75,9 @@ wachsen mit.
 - Nach Standby oder Tab-Wechsel zeigt die Uhr sofort wieder die richtige Zeit.
 
 **Tipp für ein Wand-Tablet oder einen Monitor:** Eine eigene Dashboard-Ansicht
-vom Typ **Panel** anlegen und nur diese Karte hineinlegen – dann füllt die Uhr
-die ganze Ansicht:
+vom Typ **Panel (einzelne Karte)** anlegen und nur diese Karte hineinlegen. Die Karte
+erkennt die Panel-Ansicht und füllt automatisch die ganze Fläche unter der
+HA-Kopfzeile – randlos, auf jedem Bildschirmformat (abschaltbar mit `panel_fill: false`):
 
 ```yaml
 views:
@@ -321,6 +322,7 @@ wall_mount: true
 | `occasion_color` | –                | Eigene Farbe für Anlässe (Hex, RGB, RAL) |
 | `message_entity` | –                | Entität, deren Text als Nachricht erscheint (z. B. `input_text`) |
 | `message_duration` | `30`           | Sekunden; `0` = solange die Entität Text hat |
+| `panel_fill`    | `true`            | In einer Panel-Ansicht den ganzen Bildschirm füllen |
 | `custom_size`   | `false`           | Breite und Höhe frei einstellen |
 | `width` / `width_unit` | `100` / `%` | Breite in `%` (der Karte) oder `px` |
 | `height` / `height_unit` | `100` / `vh` | Höhe in `vh` (% der Bildschirmhöhe) oder `px` |

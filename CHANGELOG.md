@@ -2,6 +2,11 @@
 
 Alle Versionen der Karte „Clock in Letters“. Die neueste steht oben.
 
+## [1.13.0] – 2026-10-03
+
+- In einer Panel-Ansicht füllt die Uhr automatisch die ganze Fläche unter der
+  HA-Kopfzeile – randlos und für jedes Bildschirmformat (abschaltbar)
+
 ## [1.12.0] – 2026-10-03
 
 - Grußzeilen: „Guten Mittag“ (Good afternoon, Goedemiddag …), Zeitraum einstellbar

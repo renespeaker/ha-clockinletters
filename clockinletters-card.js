@@ -5,7 +5,7 @@
  * plus vier Eck-Punkte für die Minuten zwischen den 5-Minuten-Schritten.
  */
 
-const CARD_VERSION = "1.12.0";
+const CARD_VERSION = "1.13.0";
 
 const GRID = [
   "ESKISTAFÜNF",
@@ -104,6 +104,7 @@ const DEFAULTS = {
   message_entity: "", // z. B. input_text.uhr_nachricht – ihr Text erscheint auf der Uhr
   message_duration: 30, // Sekunden; 0 = solange die Entität Text hat
   // Größe & Position
+  panel_fill: true, // In einer Panel-Ansicht den ganzen Bildschirm füllen
   custom_size: false, // false: quadratisch und automatisch – true: Breite/Höhe frei
   width: 100,
   width_unit: "%", // % (der Kartenbreite) oder px
@@ -1032,8 +1033,37 @@ class ClockInLettersCard extends HTMLElement {
     return { columns: 6, rows: "auto", min_columns: 3 };
   }
 
+  /** Steckt die Karte in einer Panel-Ansicht (eine Karte füllt die ganze Ansicht)? */
+  _detectPanel() {
+    let n = this;
+    for (let i = 0; i < 40 && n; i++) {
+      if (n.localName === "hui-panel-view") return true;
+      n = n.parentNode || (n.host ? n.host : null);
+      if (n && n.nodeType === 11) n = n.host; // ShadowRoot -> Host
+    }
+    return false;
+  }
+
+  /** Freie Höhe vom oberen Kartenrand bis zum unteren Bildschirmrand messen */
+  _measureFill() {
+    if (!this._inPanel || this._fs) return;
+    const top = this.getBoundingClientRect().top + (window.scrollY || 0);
+    const h = Math.max(100, Math.floor(window.innerHeight - Math.max(0, top)));
+    if (h !== this._fillH) {
+      this._fillH = h;
+      this.style.setProperty("--fill-h", `${h}px`);
+    }
+  }
+
   connectedCallback() {
+    const inPanel = this._detectPanel();
+    if (inPanel !== this._inPanel) this._inPanel = inPanel;
     this._render();
+    if (this._inPanel) {
+      this._measureFill();
+      requestAnimationFrame(() => this._measureFill());
+      setTimeout(() => this._measureFill(), 500); // nach dem Aufbau der Ansicht erneut messen
+    }
     this._schedule();
     if (!this._listening) {
       this._listening = true;
@@ -1076,6 +1106,8 @@ class ClockInLettersCard extends HTMLElement {
       document.addEventListener("fullscreenchange", this._onFsChange);
       document.addEventListener("webkitfullscreenchange", this._onFsChange);
       document.addEventListener("visibilitychange", this._onVisible);
+      this._onResize = () => this._measureFill();
+      window.addEventListener("resize", this._onResize);
     }
   }
 
@@ -1097,6 +1129,7 @@ class ClockInLettersCard extends HTMLElement {
       document.removeEventListener("fullscreenchange", this._onFsChange);
       document.removeEventListener("webkitfullscreenchange", this._onFsChange);
       document.removeEventListener("visibilitychange", this._onVisible);
+      window.removeEventListener("resize", this._onResize);
     }
     if (this._fs) this._exitFullscreen();
   }
@@ -1184,6 +1217,7 @@ class ClockInLettersCard extends HTMLElement {
   _exitFullscreen() {
     this._fs = false;
     this.classList.remove("fs");
+    requestAnimationFrame(() => this._measureFill());
     const el = document.fullscreenElement || document.webkitFullscreenElement;
     if (el === this) {
       const exit = document.exitFullscreen || document.webkitExitFullscreen;
@@ -1476,14 +1510,20 @@ class ClockInLettersCard extends HTMLElement {
     const fit = c.fit_screen !== false;
     const framed = wall || view3d;
     const fsBg = toCss(c.fullscreen_background, DEFAULTS.fullscreen_background);
+    // Panel-Ansicht: ganze Fläche unter der HA-Kopfzeile füllen (Höhe misst _measureFill)
+    const fill = !c.custom_size && c.panel_fill !== false && !!this._inPanel;
     // Freie Größe: Breite (X) und Höhe (Y) in % / px bzw. % Bildschirmhöhe / px
-    const custom = !!c.custom_size;
-    const sizeW = custom
+    const custom = !!c.custom_size || fill;
+    const sizeW = fill
+      ? "100%"
+      : custom
       ? c.width_unit === "px"
         ? `${clamp(c.width, 50, 8000, 400)}px`
         : `${clamp(c.width, 5, 100, 100)}%`
       : "";
-    const sizeH = custom
+    const sizeH = fill
+      ? "var(--fill-h, calc(100vh - var(--header-height, 56px)))"
+      : custom
       ? c.height_unit === "px"
         ? `${clamp(c.height, 50, 8000, 400)}px`
         : `${clamp(c.height, 5, 100, 100)}vh`
@@ -1578,11 +1618,12 @@ class ClockInLettersCard extends HTMLElement {
         /* Freie Höhe: Uhr ist nicht mehr quadratisch, die Buchstaben verteilen sich */
         .face {
           aspect-ratio: auto;
-          height: ${c.height_unit === "px" ? sizeH : `calc(${sizeH} - (var(--header-height, 56px) + 16px) * ${clamp(c.height, 5, 100, 100) / 100})`};
+          height: ${fill || c.height_unit === "px" ? sizeH : `calc(${sizeH} - (var(--header-height, 56px) + 16px) * ${clamp(c.height, 5, 100, 100) / 100})`};
         }`
             : ""
         }
         ${offX || offY ? "ha-card { overflow: visible; }" : ""}
+        ${fill && !framed ? ":host ha-card { border-radius: 0; border: none; box-shadow: none; } ha-card .face { border-radius: 0; }" : ""}
         ${
           fit && !framed
             ? `
@@ -2085,6 +2126,7 @@ const LABELS = {
   greeting_night_start: "Nacht ab",
   message_entity: "Nachricht aus Entität (z. B. input_text)",
   message_duration: "Nachricht anzeigen für (0 = solange Text da ist)",
+  panel_fill: "In Panel-Ansicht ganzen Bildschirm füllen",
   custom_size: "Breite und Höhe frei einstellen",
   width: "Breite (X)",
   width_unit: "Einheit Breite",
@@ -2142,7 +2184,10 @@ const LABELS = {
 function sizeSection(data) {
   const num = (min, max, unit, mode) => ({ number: { min, max, step: 1, mode, unit_of_measurement: unit } });
   const unitSelect = (options) => ({ select: { mode: "dropdown", options } });
-  const schema = [{ name: "custom_size", selector: { boolean: {} } }];
+  const schema = [
+    { name: "panel_fill", selector: { boolean: {} } },
+    { name: "custom_size", selector: { boolean: {} } },
+  ];
   if (data.custom_size) {
     schema.push(
       {
