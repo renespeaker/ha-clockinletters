@@ -8,7 +8,7 @@ global.window = {};
 global.document = { getElementById: () => null };
 console.info = () => {};
 
-const { easterSunday, parseBirthdays, occasionFor, wallDate, GREETINGS, greetingFromState, greetingForMinute, parseColorCode, normalizeColorCode, colorCodeOf, RAL_CLASSIC, computeWords, wordsToText, GRID_EN, LAYOUTS, wallClock, parseTime, inTimeWindow, hsToRgb, isActive } = require("../clockinletters-card.js");
+const { normalizeCode, easterSunday, parseBirthdays, occasionFor, wallDate, GREETINGS, greetingFromState, greetingForMinute, parseColorCode, normalizeColorCode, colorCodeOf, RAL_CLASSIC, computeWords, wordsToText, GRID_EN, LAYOUTS, wallClock, parseTime, inTimeWindow, hsToRgb, isActive } = require("../clockinletters-card.js");
 
 const de = (h, m, cfg = {}) =>
   wordsToText(computeWords(new Date(2026, 0, 1, h, m), { show_es_ist: true, dialect: "west", zwanzig: "zwanzig", ...cfg }).words);
@@ -239,5 +239,11 @@ assert.strictEqual(occ(2026, 7, 1, 8, {}, true), "Herzlichen Glückwunsch");
 assert.strictEqual(occasionFor({ y: 2026, mo: 12, d: 31, h: 23 }, { language: "en" }, false).text, "Happy New Year");
 assert.strictEqual(occasionFor({ y: 2026, mo: 12, d: 25, h: 9 }, { language: "fr" }, false).text, "Joyeux Noël");
 assert.deepStrictEqual(wallDate(new Date(Date.UTC(2026, 11, 31, 23, 30)), "Europe/Berlin"), { y: 2027, mo: 1, d: 1, h: 0 });
+
+// Geheimwort
+assert.strictEqual(normalizeCode(" oma "), "OMA");
+assert.strictEqual(normalizeCode("Óma-1"), "OMA");
+assert.strictEqual(normalizeCode("Zwölf"), "ZWÖLF");
+assert.strictEqual(normalizeCode(""), "");
 
 console.log(`OK – ${cases.length} Uhrzeiten, alle 1440 Minuten, Zeitzonen, Nachtfenster, Farbcodes, Grüße und Anlässe geprüft`);

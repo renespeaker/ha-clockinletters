@@ -5,7 +5,7 @@
  * plus vier Eck-Punkte für die Minuten zwischen den 5-Minuten-Schritten.
  */
 
-const CARD_VERSION = "1.14.0";
+const CARD_VERSION = "1.15.0";
 
 const GRID = [
   "ESKISTAFÜNF",
@@ -103,6 +103,12 @@ const DEFAULTS = {
   occasion_color: "", // leer = Farbe der leuchtenden Buchstaben
   message_entity: "", // z. B. input_text.uhr_nachricht – ihr Text erscheint auf der Uhr
   message_duration: 30, // Sekunden; 0 = solange die Entität Text hat
+  // Sichtschutz: Bildschirmsperre mit Geheimwort (kein echter Zugriffsschutz!)
+  lock: false,
+  lock_code: "", // Geheimwort, Buchstabe für Buchstabe auf der Uhr antippen, z. B. "OMA"
+  lock_timeout: 5, // Minuten ohne Berührung bis zur Sperre (0 = nur beim Start / per Entität)
+  lock_entity: "", // optional: nur sperren, solange diese Entität an ist (z. B. input_boolean.besuch)
+  lock_on_start: true, // nach dem Laden der Seite gesperrt starten
   // Größe & Position
   panel_fill: "auto", // auto: in Panel-Ansicht ganze Fläche füllen – always: immer füllen – off: quadratisch
   custom_size: false, // false: quadratisch und automatisch – true: Breite/Höhe frei
@@ -987,7 +993,10 @@ class ClockInLettersCard extends HTMLElement {
   setConfig(config) {
     this._config = withTheme(config);
     this._built = false;
-    if (this.isConnected) this._render();
+    if (this.isConnected) {
+      this._render();
+      this._registerLock();
+    }
   }
 
   set hass(hass) {
@@ -1072,11 +1081,32 @@ class ClockInLettersCard extends HTMLElement {
     for (const ms of [300, 1000, 2500, 5000]) setTimeout(check, ms);
   }
 
+  /** Liegt die Karte in der Vorschau des Karten-Editors? Dort nie sperren. */
+  _inEditor() {
+    let n = this;
+    for (let i = 0; i < 60 && n; i++) {
+      if (/^(hui-dialog-edit-card|hui-card-preview|hui-card-picker|hui-dialog-create-card)$/.test(n.localName || "")) return true;
+      n = n.parentNode || null;
+      if (n && n.nodeType === 11) n = n.host;
+    }
+    return false;
+  }
+
+  /** Sichtschutz an die seitenweite Steuerung übergeben */
+  _registerLock() {
+    const c = this._config;
+    if (!c || c._screen || this.preview || this.editMode || this._inEditor()) return;
+    const ctl = LockController.get();
+    if (c.lock) ctl.configure(c, this);
+    else if (ctl.source === this) ctl.configure(null, this);
+  }
+
   connectedCallback() {
     const inPanel = this._detectPanel();
     if (inPanel !== this._inPanel) this._inPanel = inPanel;
     this._render();
     this._afterLayout();
+    this._registerLock();
     this._schedule();
     if (!this._listening) {
       this._listening = true;
@@ -1115,6 +1145,17 @@ class ClockInLettersCard extends HTMLElement {
         }
       };
       this.addEventListener("click", this._onClick);
+      // Sperrbildschirm: angetippte Buchstaben melden
+      this._onLetter = (ev) => {
+        if (!this._config || !this._config._screen) return;
+        const cell = ev.composedPath().find((n) => n.classList && n.classList.contains("l"));
+        if (!cell) return;
+        cell.classList.add("tap");
+        setTimeout(() => cell.classList.remove("tap"), 350);
+        const letter = cell.textContent.trim();
+        this.dispatchEvent(new CustomEvent("clockinletters-letter", { detail: { letter }, bubbles: true, composed: true }));
+      };
+      this.addEventListener("click", this._onLetter);
       document.addEventListener("keydown", this._onKey);
       document.addEventListener("fullscreenchange", this._onFsChange);
       document.addEventListener("webkitfullscreenchange", this._onFsChange);
@@ -1525,7 +1566,7 @@ class ClockInLettersCard extends HTMLElement {
     const fsBg = toCss(c.fullscreen_background, DEFAULTS.fullscreen_background);
     // Panel-Ansicht: ganze Fläche unter der HA-Kopfzeile füllen (Höhe misst _measureFill)
     const fillMode = c.panel_fill === false || c.panel_fill === "off" ? "off" : c.panel_fill === "always" ? "always" : "auto";
-    const fill = !c.custom_size && (fillMode === "always" || (fillMode === "auto" && !!this._inPanel));
+    const fill = !!c._screen || (!c.custom_size && (fillMode === "always" || (fillMode === "auto" && !!this._inPanel)));
     this._fillActive = fill;
     // Freie Größe: Breite (X) und Höhe (Y) in % / px bzw. % Bildschirmhöhe / px
     const custom = !!c.custom_size || fill;
@@ -1536,7 +1577,9 @@ class ClockInLettersCard extends HTMLElement {
         ? `${clamp(c.width, 50, 8000, 400)}px`
         : `${clamp(c.width, 5, 100, 100)}%`
       : "";
-    const sizeH = fill
+    const sizeH = c._screen
+      ? "100vh"
+      : fill
       ? "var(--fill-h, calc(100vh - var(--header-height, 56px)))"
       : custom
       ? c.height_unit === "px"
@@ -1739,6 +1782,10 @@ class ClockInLettersCard extends HTMLElement {
         .greet .row { display: flex; justify-content: space-between; }`
             : ""
         }
+        /* Sperrbildschirm: angetippter Buchstabe leuchtet kurz auf, falsche Eingabe wackelt */
+        .l.tap { color: ${onLit}; text-shadow: 0 0 0.3em var(--ct-on); transition: none; }
+        @keyframes ct-shake { 0%, 100% { transform: translateX(0); } 25% { transform: translateX(-1.5%); } 75% { transform: translateX(1.5%); } }
+        .face.pin-wrong .grid { animation: ct-shake 0.15s ease-in-out 3; }
         /* Alarm: leuchtende Buchstaben pulsieren */
         ${
           dynamic && dynamic.alert && c.alert_pulse !== false
@@ -2065,7 +2112,11 @@ class ClockInLettersCardEditor extends HTMLElement {
       this._form = document.createElement("ha-form");
       this._form.computeLabel = (s) => s.title || LABELS[s.name] || (s.name.endsWith("_code") ? "Farbcode" : s.name);
       this._form.computeHelper = (s) =>
-        s.name && s.name.endsWith("_code") ? "Hex (#4B573E), RGB (75, 87, 62) oder RAL (RAL 6003)" : undefined;
+        s.name === "lock_code"
+          ? "Nur ein Sichtschutz, kein Zugriffsschutz: das Wort steht im Dashboard-YAML. Groß/klein egal."
+          : s.name && s.name.endsWith("_code")
+          ? "Hex (#4B573E), RGB (75, 87, 62) oder RAL (RAL 6003)"
+          : undefined;
       this._form.addEventListener("value-changed", (ev) => {
         const config = { ...ev.detail.value };
         // Farbcode-Felder: gültiger Code ersetzt die Farbe, ungültiger (noch beim Tippen) wird ignoriert
@@ -2126,6 +2177,11 @@ function sameValue(a, b) {
 }
 
 const LABELS = {
+  lock: "Sichtschutz einschalten (Bildschirmsperre für Besucher)",
+  lock_code: "Geheimwort (Buchstaben nacheinander auf der Uhr antippen)",
+  lock_timeout: "Sperren nach … ohne Berührung (0 = nie automatisch)",
+  lock_entity: "Nur sperren, solange diese Entität an ist (z. B. Besuchermodus)",
+  lock_on_start: "Nach dem Laden gesperrt starten",
   occasions: "Anlässe anzeigen (Ostern, Weihnachten, Neujahr, Geburtstage …)",
   occasion_easter: "Ostern",
   occasion_christmas: "Weihnachten",
@@ -2383,9 +2439,37 @@ function occasionSection(data) {
   };
 }
 
+/** Sichtschutz: Details nur zeigen, wenn eingeschaltet */
+function lockSection(data) {
+  const schema = [{ name: "lock", selector: { boolean: {} } }];
+  if (data.lock) {
+    schema.push(
+      { name: "lock_code", selector: { text: { type: "password" } } },
+      { name: "lock_timeout", selector: { number: { min: 0, max: 60, step: 1, mode: "slider", unit_of_measurement: "min" } } },
+      { name: "lock_entity", selector: { entity: {} } },
+      { name: "lock_on_start", selector: { boolean: {} } }
+    );
+  }
+  return {
+    type: "expandable",
+    name: "sichtschutz",
+    flatten: true,
+    title: "Sichtschutz (Bildschirmsperre)",
+    icon: "mdi:eye-off-outline",
+    schema,
+  };
+}
+
 function buildSchema(data) {
   const i = SCHEMA.findIndex((s) => s.name === "bildschirm");
-  return withColorCodes([...SCHEMA.slice(0, i), greetingSection(data), occasionSection(data), sizeSection(data), ...SCHEMA.slice(i)]);
+  return withColorCodes([
+    ...SCHEMA.slice(0, i),
+    greetingSection(data),
+    occasionSection(data),
+    lockSection(data),
+    sizeSection(data),
+    ...SCHEMA.slice(i),
+  ]);
 }
 
 const slider = (min, max, step = 1) => ({
@@ -2704,6 +2788,176 @@ const SCHEMA = [
   },
 ];
 
+/** Geheimwort vergleichbar machen: nur Buchstaben, Großschrift, Ó -> O */
+function normalizeCode(text) {
+  return String(text || "")
+    .toUpperCase()
+    .replace(/Ó/g, "O")
+    .replace(/[^A-ZÄÖÜ]/g, "");
+}
+
+/**
+ * Seitenweiter Sichtschutz. Home Assistant ist eine Single-Page-App: einmal von einer
+ * Karte eingerichtet, bleibt die Sperre auch beim Wechsel auf andere Ansichten aktiv.
+ * Hinweis: Das ist nur ein Sichtschutz (z. B. für Besucher), kein Zugriffsschutz.
+ */
+class LockController {
+  static get() {
+    if (!window.__clockInLettersLock) window.__clockInLettersLock = new LockController();
+    return window.__clockInLettersLock;
+  }
+
+  constructor() {
+    this.cfg = null;
+    this.source = null;
+    this.locked = false;
+    this.input = "";
+    this.configuredOnce = false;
+    this.onActivity = () => this.activity();
+    for (const ev of ["pointerdown", "keydown", "touchstart", "wheel"]) {
+      document.addEventListener(ev, this.onActivity, { passive: true, capture: true });
+    }
+    setInterval(() => this.tick(), 2000);
+  }
+
+  hass() {
+    const ha = document.querySelector("home-assistant");
+    return (ha && ha.hass) || (this.source && this.source._hass) || null;
+  }
+
+  enabled() {
+    const c = this.cfg;
+    if (!c || !c.lock || !normalizeCode(c.lock_code)) return false;
+    if (c.lock_entity) {
+      const hass = this.hass();
+      const st = hass && hass.states && hass.states[c.lock_entity];
+      return !!st && isActive(st.state);
+    }
+    return true;
+  }
+
+  configure(cfg, source) {
+    this.cfg = cfg;
+    this.source = cfg ? source : null;
+    if (!this.enabled()) {
+      this.unlock();
+      clearTimeout(this.idleTimer);
+      this.wasEnabled = false;
+      return;
+    }
+    // Nur direkt nach dem Laden der Seite gesperrt starten – nicht beim Einschalten im Editor
+    const justLoaded = performance.now() < 30000;
+    if (!this.configuredOnce && justLoaded && cfg.lock_on_start !== false) this.lock();
+    else if (this.locked) this.showOverlay();
+    else this.activity();
+    this.configuredOnce = true;
+    this.wasEnabled = true;
+  }
+
+  activity() {
+    if (this.locked || !this.cfg) return;
+    clearTimeout(this.idleTimer);
+    const minutes = clamp(this.cfg.lock_timeout, 0, 1440, DEFAULTS.lock_timeout);
+    if (minutes > 0 && this.enabled()) this.idleTimer = setTimeout(() => this.lock(), minutes * 60000);
+  }
+
+  tick() {
+    if (!this.cfg) return;
+    const enabled = this.enabled();
+    if (!enabled && this.locked) this.unlock();
+    // Besuchermodus eingeschaltet -> sofort sperren
+    if (enabled && !this.wasEnabled && this.cfg.lock_entity) this.lock();
+    if (enabled && !this.wasEnabled && !this.locked) this.activity();
+    this.wasEnabled = enabled;
+    if (this.card) this.card.hass = this.hass();
+  }
+
+  lock() {
+    if (!this.enabled()) return;
+    clearTimeout(this.idleTimer);
+    this.locked = true;
+    this.input = "";
+    this.showOverlay();
+  }
+
+  unlock() {
+    this.locked = false;
+    this.input = "";
+    if (this.overlay) this.overlay.style.display = "none";
+    this.activity();
+  }
+
+  showOverlay() {
+    if (!this.overlay) {
+      const o = document.createElement("div");
+      o.id = "clockinletters-lock";
+      o.style.cssText =
+        "position:fixed;inset:0;z-index:2147483000;background:#000;overflow:hidden;touch-action:manipulation;user-select:none;";
+      const card = document.createElement("clockinletters-card");
+      card.style.cssText = "display:block;width:100vw;height:100vh;";
+      const dots = document.createElement("div");
+      dots.style.cssText =
+        "position:absolute;left:0;right:0;bottom:4vh;text-align:center;font:600 3vh sans-serif;letter-spacing:1vh;color:rgba(255,255,255,0.55);pointer-events:none;transition:opacity .3s;opacity:0;";
+      o.append(card, dots);
+      o.addEventListener("clockinletters-letter", (ev) => this.letter(ev.detail.letter));
+      document.body.appendChild(o);
+      this.overlay = o;
+      this.card = card;
+      this.dots = dots;
+    }
+    const c = this.cfg;
+    this.card.setConfig({
+      ...c,
+      _screen: true,
+      lock: false,
+      tap_action: "none",
+      double_tap_action: "none",
+      wall_mount: false,
+      view_3d: false,
+      offset_x: 0,
+      offset_y: 0,
+      panel_fill: "off",
+      custom_size: false,
+    });
+    this.card.hass = this.hass();
+    this.overlay.style.display = "block";
+    this.overlay.style.background = toCss(c.fullscreen_background, DEFAULTS.fullscreen_background);
+    this.renderDots();
+  }
+
+  renderDots() {
+    if (!this.dots) return;
+    const len = normalizeCode(this.cfg && this.cfg.lock_code).length;
+    this.dots.textContent = "●".repeat(this.input.length) + "○".repeat(Math.max(0, len - this.input.length));
+    this.dots.style.opacity = this.input.length ? "1" : "0";
+  }
+
+  letter(ch) {
+    if (!this.locked || !this.cfg) return;
+    const code = normalizeCode(this.cfg.lock_code);
+    this.input += normalizeCode(ch);
+    clearTimeout(this.inputTimer);
+    // Angefangene Eingabe nach 8 Sekunden verwerfen
+    this.inputTimer = setTimeout(() => {
+      this.input = "";
+      this.renderDots();
+    }, 8000);
+    if (this.input.length >= code.length) {
+      if (this.input === code) {
+        this.unlock();
+        return;
+      }
+      this.input = "";
+      const face = this.card && this.card.shadowRoot && this.card.shadowRoot.querySelector(".face");
+      if (face) {
+        face.classList.add("pin-wrong");
+        setTimeout(() => face.classList.remove("pin-wrong"), 500);
+      }
+    }
+    this.renderDots();
+  }
+}
+
 if (!customElements.get("clockinletters-card")) {
   customElements.define("clockinletters-card", ClockInLettersCard);
   customElements.define("clockinletters-card-editor", ClockInLettersCardEditor);
@@ -2725,4 +2979,4 @@ console.info(
   "color: #fff; background: #111;"
 );
 
-if (typeof module !== "undefined") module.exports = { easterSunday, parseBirthdays, occasionFor, wallDate, OCCASION_TEXTS, GREETINGS, greetingFromState, greetingForMinute, parseColorCode, normalizeColorCode, colorCodeOf, RAL_CLASSIC, LAYOUTS, hsToRgb, isActive, wallClock, parseTime, inTimeWindow, GRID_EN, computeWords, wordsToText, toCss, toRgb, resolveFont, withTheme, THEMES };
+if (typeof module !== "undefined") module.exports = { normalizeCode, easterSunday, parseBirthdays, occasionFor, wallDate, OCCASION_TEXTS, GREETINGS, greetingFromState, greetingForMinute, parseColorCode, normalizeColorCode, colorCodeOf, RAL_CLASSIC, LAYOUTS, hsToRgb, isActive, wallClock, parseTime, inTimeWindow, GRID_EN, computeWords, wordsToText, toCss, toRgb, resolveFont, withTheme, THEMES };

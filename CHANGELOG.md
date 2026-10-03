@@ -2,6 +2,13 @@
 
 Alle Versionen der Karte „Clock in Letters“. Die neueste steht oben.
 
+## [1.15.0] – 2026-10-03
+
+- Sichtschutz für Besucher: Nach einstellbarer Zeit ohne Berührung (oder im Besuchermodus
+  über eine Entität) legt sich die Uhr über das ganze Home Assistant; entsperrt wird durch
+  Antippen eines Geheimworts Buchstabe für Buchstabe auf der Uhr. Nur Sichtschutz,
+  kein Zugriffsschutz.
+
 ## [1.14.0] – 2026-10-03
 
 - „Bildschirm füllen“: neue Einstellung „Immer die ganze Fläche füllen“, die ohne

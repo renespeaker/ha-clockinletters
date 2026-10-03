@@ -227,6 +227,35 @@ automation:
 Ist `message_duration: 0`, bleibt die Nachricht stehen, bis die Entität wieder leer ist
 (`input_text.set_value` mit `value: ""`).
 
+## Sichtschutz für Besucher (Bildschirmsperre)
+
+Damit Besucher z. B. eure Termine auf dem Wandmonitor nicht sehen: Nach einigen Minuten
+ohne Berührung legt sich die Uhr bildschirmfüllend über **das ganze Home Assistant**.
+Entsperrt wird mit einem **Geheimwort**, dessen Buchstaben du **nacheinander auf der Uhr
+antippst** – z. B. `OMA`: irgendein O, dann ein M, dann ein A. Für Besucher ist es einfach
+nur eine Uhr. Nach dem ersten Tippen zeigen dezente Punkte den Fortschritt, bei falscher
+Eingabe wackelt die Uhr kurz.
+
+```yaml
+type: custom:clockinletters-card
+lock: true
+lock_code: OMA            # Groß/Klein egal
+lock_timeout: 5           # Minuten ohne Berührung (0 = nie automatisch)
+lock_entity: input_boolean.besuch   # optional: nur sperren, solange Besuch da ist
+```
+
+Mit `lock_entity` wird nur gesperrt, solange die Entität an ist – schaltet eine Automation
+den „Besuchermodus“ ein, sperrt die Uhr sofort; aus = wieder frei.
+
+**Wichtig:**
+- Das ist ein **Sichtschutz, kein Zugriffsschutz**. Das Geheimwort steht im Dashboard-YAML,
+  und wer sich auskennt, kommt über einen anderen Browser oder die Adresszeile trotzdem
+  ins Home Assistant.
+- Home Assistant ist eine Single-Page-App: Die Sperre gilt auf **allen Ansichten**, sobald die
+  Karte einmal geladen wurde. Lade die Karte daher in der Ansicht, mit der der Monitor startet
+  (z. B. die Uhr-Ansicht).
+- In der Vorschau des Karten-Editors wird nie gesperrt.
+
 ## Home Assistant einbinden
 
 ```yaml
@@ -323,6 +352,11 @@ wall_mount: true
 | `occasion_color` | –                | Eigene Farbe für Anlässe (Hex, RGB, RAL) |
 | `message_entity` | –                | Entität, deren Text als Nachricht erscheint (z. B. `input_text`) |
 | `message_duration` | `30`           | Sekunden; `0` = solange die Entität Text hat |
+| `lock`          | `false`           | Sichtschutz (Bildschirmsperre) einschalten |
+| `lock_code`     | –                 | Geheimwort, Buchstaben nacheinander auf der Uhr antippen |
+| `lock_timeout`  | `5`               | Minuten ohne Berührung bis zur Sperre (`0` = nie automatisch) |
+| `lock_entity`   | –                 | Nur sperren, solange diese Entität an ist (Besuchermodus) |
+| `lock_on_start` | `true`            | Nach dem Laden der Seite gesperrt starten |
 | `panel_fill`    | `auto`            | Bildschirm füllen: `auto` (in Panel-Ansicht), `always` (immer), `off` (quadratisch) |
 | `custom_size`   | `false`           | Breite und Höhe frei einstellen |
 | `width` / `width_unit` | `100` / `%` | Breite in `%` (der Karte) oder `px` |
