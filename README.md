@@ -68,8 +68,9 @@ wachsen mit.
 - **An Bildschirmhöhe anpassen** (`fit_screen`, Standard an): Die Uhr wird nie
   höher als der sichtbare Bildschirm und bleibt auf breiten Monitoren quadratisch
   und zentriert.
-- **Vollbild:** Uhr antippen/anklicken → Vollbild, erneut antippen oder `Esc` →
-  zurück. Im Vollbild wird die Uhr so groß wie möglich dargestellt, der
+- **Vollbild** (unter „Bildschirm & Vollbild“ auf Antippen oder Doppeltippen legen):
+  erneut antippen, `Esc`, der Knopf **„✕ Vollbild beenden“** oben rechts oder
+  **1,5 Sekunden gedrückt halten** beendet es. Im Vollbild wird die Uhr so groß wie möglich dargestellt, der
   Mauszeiger ausgeblendet und der Bildschirm wach gehalten (sofern der Browser
   das unterstützt, benötigt HTTPS).
 - Nach Standby oder Tab-Wechsel zeigt die Uhr sofort wieder die richtige Zeit.
@@ -128,9 +129,9 @@ Seite. Im Vollbild füllt eine frei eingestellte Uhr den ganzen Bildschirm.
 
 ## Antippen: Vollbild und Info-Anzeige
 
-- **Antippen** schaltet das Vollbild ein/aus (`tap_action: fullscreen`)
-- **Doppeltippen** zeigt für ein paar Sekunden Wochentag, Datum und frei wählbare Werte
-  im Stil der Uhr (`double_tap_action: info`)
+- **Antippen** zeigt für ein paar Sekunden Wochentag, Datum und frei wählbare Werte
+  im Stil der Uhr (`tap_action: info`)
+- Vollbild lässt sich auf Antippen oder Doppeltippen legen (`fullscreen`)
 
 ```yaml
 type: custom:clockinletters-card
@@ -317,8 +318,8 @@ wall_mount: true
 | `stencil`       | `true`            | Stege in O, Ö, Q, D wie bei ausgefrästen Buchstaben |
 | `language`      | `de`              | Sprache des Buchstabenrasters: `de`, `en`, `nl`, `fr`, `es` |
 | `fit_screen`    | `true`            | Uhr nie höher als der Bildschirm (quadratisch, zentriert) |
-| `tap_action`    | `fullscreen`      | Beim Antippen: `fullscreen`, `info` oder `none` |
-| `double_tap_action` | `info`        | Beim Doppeltippen: `info`, `fullscreen` oder `none` |
+| `tap_action`    | `info`            | Beim Antippen: `info`, `fullscreen` oder `none` |
+| `double_tap_action` | `none`        | Beim Doppeltippen: `info`, `fullscreen` oder `none` |
 | `info_entities` | –                 | Werte für die Info-Anzeige, z. B. Temperatur |
 | `info_duration` | `8`               | Sekunden, bis wieder die Uhr erscheint |
 | `fullscreen_background` | `[0, 0, 0]` | Hintergrund im Vollbild |

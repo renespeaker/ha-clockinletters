@@ -5,7 +5,7 @@
  * plus vier Eck-Punkte für die Minuten zwischen den 5-Minuten-Schritten.
  */
 
-const CARD_VERSION = "1.15.0";
+const CARD_VERSION = "1.15.1";
 
 const GRID = [
   "ESKISTAFÜNF",
@@ -76,8 +76,8 @@ const DEFAULTS = {
   view_3d: false, // schräge Ansicht mit sichtbarer Plattenkante
   stencil: true, // Stege in O, Ö, Q, D wie bei ausgefrästen Buchstaben
   fit_screen: true, // Uhr nie höher als der Bildschirm (wichtig bei Panel-Ansicht / großen Monitoren)
-  tap_action: "fullscreen", // fullscreen: Vollbild ein/aus – info: Datum & Werte zeigen – none: nichts
-  double_tap_action: "info", // dasselbe für Doppeltippen
+  tap_action: "info", // info: Datum & Werte zeigen – fullscreen: Vollbild ein/aus – none: nichts
+  double_tap_action: "none", // dasselbe für Doppeltippen
   info_entities: [], // Werte, die bei "info" angezeigt werden (z. B. Temperatur)
   info_duration: 8, // Sekunden, bis wieder die Uhr erscheint
   // Grußzeilen & Nachrichten
@@ -1057,6 +1057,9 @@ class ClockInLettersCard extends HTMLElement {
   /** Freie Höhe vom oberen Kartenrand bis zum unteren Bildschirmrand messen */
   _measureFill() {
     if (!this._fillActive || this._fs) return;
+    // Während (oder direkt nach) einem Vollbild liefert der Browser die Größe des ganzen Bildschirms
+    if (document.fullscreenElement || document.webkitFullscreenElement) return;
+    if (Date.now() < (this._noMeasureUntil || 0)) return;
     const top = this.getBoundingClientRect().top + (window.scrollY || 0);
     const h = Math.max(100, Math.floor(window.innerHeight - Math.max(0, top)));
     if (h !== this._fillH) {
@@ -1111,6 +1114,10 @@ class ClockInLettersCard extends HTMLElement {
     if (!this._listening) {
       this._listening = true;
       this._onClick = () => {
+        if (this._swallowClick) {
+          this._swallowClick = false;
+          return;
+        }
         // Im Dashboard-Editor nichts auslösen
         if (this.preview || this.editMode || !this._config) return;
         const tap = this._config.tap_action || "none";
@@ -1134,7 +1141,22 @@ class ClockInLettersCard extends HTMLElement {
       this._onFsChange = () => {
         const el = document.fullscreenElement || document.webkitFullscreenElement;
         if (!el && this._fs && this._nativeFs) this._exitFullscreen();
+        else if (!el) this._afterFullscreen();
       };
+      // Notausgang: 1,5 Sekunden gedrückt halten beendet das Vollbild immer
+      this._onPressStart = () => {
+        clearTimeout(this._pressTimer);
+        if (!this._fs) return;
+        this._pressTimer = setTimeout(() => {
+          this._swallowClick = true;
+          this._exitFullscreen();
+        }, 1500);
+      };
+      this._onPressEnd = () => clearTimeout(this._pressTimer);
+      this.addEventListener("pointerdown", this._onPressStart);
+      this.addEventListener("pointerup", this._onPressEnd);
+      this.addEventListener("pointercancel", this._onPressEnd);
+      this.addEventListener("pointerleave", this._onPressEnd);
       // Nach Standby / Tab-Wechsel sofort die richtige Zeit zeigen
       this._onVisible = () => {
         if (document.visibilityState === "visible") {
@@ -1271,7 +1293,7 @@ class ClockInLettersCard extends HTMLElement {
   _exitFullscreen() {
     this._fs = false;
     this.classList.remove("fs");
-    requestAnimationFrame(() => this._measureFill());
+    this._afterFullscreen();
     const el = document.fullscreenElement || document.webkitFullscreenElement;
     if (el === this) {
       const exit = document.exitFullscreen || document.webkitExitFullscreen;
@@ -1282,6 +1304,22 @@ class ClockInLettersCard extends HTMLElement {
       this._wakeLock.release().catch(() => {});
       this._wakeLock = null;
     }
+  }
+
+  /**
+   * Nach dem Vollbild: Firefox (z. B. auf dem Raspberry Pi) meldet die neue Fenstergröße erst
+   * verzögert. Deshalb kurz nicht messen, dann mehrfach neu messen und die Seite nach oben
+   * scrollen, damit die HA-Kopfzeile wieder sichtbar ist.
+   */
+  _afterFullscreen() {
+    this._noMeasureUntil = Date.now() + 250;
+    this._fillH = undefined;
+    const fix = () => {
+      if (this._fs) return;
+      this._measureFill();
+      if (window.scrollY > 0) window.scrollTo(0, 0);
+    };
+    for (const ms of [300, 700, 1500, 3000]) setTimeout(fix, ms);
   }
 
   async _requestWakeLock() {
@@ -1797,6 +1835,24 @@ class ClockInLettersCard extends HTMLElement {
         .grid, .dot, .greet {
           transform: translate(calc(var(--shift-x, 0) * var(--u, 1cqi)), calc(var(--shift-y, 0) * var(--u, 1cqi)));
         }
+        /* Notausgang im Vollbild: dezenter Knopf oben rechts */
+        .fs-exit { display: none; }
+        :host(.fs) .fs-exit {
+          display: block;
+          position: absolute;
+          top: calc(2 * var(--u, 1cqi));
+          right: calc(2 * var(--u, 1cqi));
+          z-index: 5;
+          padding: 0.6em 1em;
+          font: 600 calc(2 * var(--u, 1cqi)) sans-serif;
+          color: rgba(255, 255, 255, 0.75);
+          background: rgba(0, 0, 0, 0.35);
+          border: 1px solid rgba(255, 255, 255, 0.25);
+          border-radius: 2em;
+          cursor: pointer;
+          opacity: 0.35;
+        }
+        :host(.fs) .fs-exit:hover { opacity: 1; }
         /* Nachtmodus: Uhr gedimmt, auf Wunsch nur die leuchtenden Buchstaben */
         .face {
           transition: filter 3s ease;
@@ -2003,6 +2059,7 @@ class ClockInLettersCard extends HTMLElement {
             }
             <div class="info" aria-live="polite"></div>
             <div class="msg" aria-live="polite"></div>
+            <button class="fs-exit" type="button" aria-label="Vollbild beenden">✕ Vollbild beenden</button>
           </div>
         </div>
       </ha-card>
@@ -2017,6 +2074,13 @@ class ClockInLettersCard extends HTMLElement {
     this._dots = [...this.shadowRoot.querySelectorAll(".dot")];
     this._face = this.shadowRoot.querySelector(".face");
     this._observeSize();
+    const exitBtn = this.shadowRoot.querySelector(".fs-exit");
+    if (exitBtn) {
+      exitBtn.addEventListener("click", (ev) => {
+        ev.stopPropagation();
+        this._exitFullscreen();
+      });
+    }
     if (this._infoShown) {
       this._fillInfo();
       this._face.classList.add("show-info");

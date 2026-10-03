@@ -2,6 +2,14 @@
 
 Alle Versionen der Karte „Clock in Letters“. Die neueste steht oben.
 
+## [1.15.1] – 2026-10-03
+
+- Behoben: Nach dem Vollbild war die Uhr (v. a. in Firefox, z. B. auf dem Raspberry Pi) zu
+  hoch und schob die HA-Kopfzeile aus dem Bild. Die Höhe wird jetzt erst nach dem Vollbild
+  gemessen, die Seite wird wieder nach oben gescrollt.
+- Notausgang im Vollbild: Knopf „✕ Vollbild beenden“ und 1,5 Sekunden gedrückt halten
+- Vollbild ist nicht mehr Standard beim Antippen (Antippen zeigt jetzt Datum & Werte)
+
 ## [1.15.0] – 2026-10-03
 
 - Sichtschutz für Besucher: Nach einstellbarer Zeit ohne Berührung (oder im Besuchermodus
