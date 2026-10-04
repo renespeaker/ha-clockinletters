@@ -5,7 +5,7 @@
  * plus vier Eck-Punkte für die Minuten zwischen den 5-Minuten-Schritten.
  */
 
-const CARD_VERSION = "1.15.1";
+const CARD_VERSION = "1.15.2";
 
 const GRID = [
   "ESKISTAFÜNF",
@@ -1294,11 +1294,10 @@ class ClockInLettersCard extends HTMLElement {
     this._fs = false;
     this.classList.remove("fs");
     this._afterFullscreen();
-    const el = document.fullscreenElement || document.webkitFullscreenElement;
-    if (el === this) {
-      const exit = document.exitFullscreen || document.webkitExitFullscreen;
-      if (exit) Promise.resolve(exit.call(document)).catch(() => {});
-    }
+    // Achtung: In Home Assistant liegt die Karte tief in Shadow-DOMs. Der Browser meldet als
+    // Vollbild-Element dann "home-assistant" statt der Karte – also nicht vergleichen,
+    // sondern ein bestehendes Browser-Vollbild immer beenden.
+    exitBrowserFullscreen();
     this._nativeFs = false;
     if (this._wakeLock) {
       this._wakeLock.release().catch(() => {});
@@ -2852,6 +2851,20 @@ const SCHEMA = [
   },
 ];
 
+/** Browser-Vollbild beenden, falls aktiv */
+function exitBrowserFullscreen() {
+  const el = document.fullscreenElement || document.webkitFullscreenElement;
+  if (!el) return;
+  const exit = document.exitFullscreen || document.webkitExitFullscreen;
+  if (exit) {
+    try {
+      Promise.resolve(exit.call(document)).catch(() => {});
+    } catch (e) {
+      // ignorieren
+    }
+  }
+}
+
 /** Geheimwort vergleichbar machen: nur Buchstaben, Großschrift, Ó -> O */
 function normalizeCode(text) {
   return String(text || "")
@@ -2939,6 +2952,12 @@ class LockController {
   lock() {
     if (!this.enabled()) return;
     clearTimeout(this.idleTimer);
+    // Eine Karte im Vollbild läge über dem Sperrbildschirm -> Vollbild zuerst beenden
+    for (const card of document.querySelectorAll("clockinletters-card")) {
+      if (card._fs) card._exitFullscreen();
+    }
+    if (this.source && this.source._fs) this.source._exitFullscreen();
+    exitBrowserFullscreen();
     this.locked = true;
     this.input = "";
     this.showOverlay();

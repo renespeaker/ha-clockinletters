@@ -2,6 +2,14 @@
 
 Alle Versionen der Karte „Clock in Letters“. Die neueste steht oben.
 
+## [1.15.2] – 2026-10-04
+
+- Behoben: Vollbild ließ sich in Home Assistant nicht beenden („gefangen in der Uhr“).
+  Der Browser meldet wegen der Verschachtelung „home-assistant“ als Vollbild-Element statt
+  der Karte; das Browser-Vollbild wird jetzt immer beendet (Antippen, Knopf, lang drücken).
+- Wird im Vollbild gesperrt, beendet die Uhr zuerst das Vollbild, damit der Sperrbildschirm
+  sichtbar ist und das Geheimwort funktioniert.
+
 ## [1.15.1] – 2026-10-03
 
 - Behoben: Nach dem Vollbild war die Uhr (v. a. in Firefox, z. B. auf dem Raspberry Pi) zu
