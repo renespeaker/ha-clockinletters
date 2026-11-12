@@ -5,7 +5,7 @@
  * plus vier Eck-Punkte für die Minuten zwischen den 5-Minuten-Schritten.
  */
 
-const CARD_VERSION = "1.15.2";
+const CARD_VERSION = "1.16.0";
 
 const GRID = [
   "ESKISTAFÜNF",
@@ -78,6 +78,7 @@ const DEFAULTS = {
   fit_screen: true, // Uhr nie höher als der Bildschirm (wichtig bei Panel-Ansicht / großen Monitoren)
   tap_action: "info", // info: Datum & Werte zeigen – fullscreen: Vollbild ein/aus – none: nichts
   double_tap_action: "none", // dasselbe für Doppeltippen
+  navigation_path: "", // Ziel für die Aktion "navigate", z. B. /lovelace/0
   info_entities: [], // Werte, die bei "info" angezeigt werden (z. B. Temperatur)
   info_duration: 8, // Sekunden, bis wieder die Uhr erscheint
   // Grußzeilen & Nachrichten
@@ -109,6 +110,8 @@ const DEFAULTS = {
   lock_timeout: 5, // Minuten ohne Berührung bis zur Sperre (0 = nur beim Start / per Entität)
   lock_entity: "", // optional: nur sperren, solange diese Entität an ist (z. B. input_boolean.besuch)
   lock_on_start: true, // nach dem Laden der Seite gesperrt starten
+  lock_return_path: "", // nach dem Entsperren zu dieser Ansicht springen, z. B. /lovelace/0
+  lock_emergency_hold: 10, // Sekunden gedrückt halten zum Notfall-Entsperren (0 = aus)
   // Größe & Position
   panel_fill: "auto", // auto: in Panel-Ansicht ganze Fläche füllen – always: immer füllen – off: quadratisch
   custom_size: false, // false: quadratisch und automatisch – true: Breite/Höhe frei
@@ -1213,6 +1216,10 @@ class ClockInLettersCard extends HTMLElement {
   _runAction(action) {
     if (action === "fullscreen") this._toggleFullscreen();
     else if (action === "info") this._toggleInfo();
+    else if (action === "navigate") {
+      if (this._fs) this._exitFullscreen();
+      navigateTo(this._config.navigation_path);
+    }
   }
 
   /** Datum und ausgewählte Werte für ein paar Sekunden statt der Uhr zeigen */
@@ -1840,7 +1847,7 @@ class ClockInLettersCard extends HTMLElement {
           display: block;
           position: absolute;
           top: calc(2 * var(--u, 1cqi));
-          right: calc(2 * var(--u, 1cqi));
+          right: calc(7 * var(--u, 1cqi));
           z-index: 5;
           padding: 0.6em 1em;
           font: 600 calc(2 * var(--u, 1cqi)) sans-serif;
@@ -1891,18 +1898,21 @@ class ClockInLettersCard extends HTMLElement {
           border-radius: 0;
           overflow: visible;
         }
+        /* Vollbild füllt jeden Bildschirm (4:3, 16:9, hochkant …), die Buchstaben verteilen sich */
         :host(.fs) .wrap {
-          width: ${custom ? "94vw" : "min(94vw, 94vh)"};
-          ${custom ? "" : "width: min(94vw, 94dvh);"}
+          width: 100vw;
           max-width: none;
           left: 0;
           top: 0;
-          padding: ${framed ? "4%" : "0"};
+          padding: ${framed ? "4vmin" : "0"};
+          box-sizing: border-box;
         }
-        ${custom ? ":host(.fs) .face { height: 94vh; height: 94dvh; }" : ""}
         :host(.fs) .face {
-          border-radius: calc(0.4 * var(--u, 1cqi));
-          ${framed ? "" : "box-shadow: 0 0 calc(6 * var(--u, 1cqi)) rgba(0, 0, 0, 0.5);"}
+          aspect-ratio: auto;
+          height: ${framed ? "calc(100vh - 8vmin)" : "100vh"};
+          height: ${framed ? "calc(100dvh - 8vmin)" : "100dvh"};
+          border-radius: 0;
+          box-shadow: none;
         }
         .face {
           position: relative;
@@ -2245,6 +2255,8 @@ const LABELS = {
   lock_timeout: "Sperren nach … ohne Berührung (0 = nie automatisch)",
   lock_entity: "Nur sperren, solange diese Entität an ist (z. B. Besuchermodus)",
   lock_on_start: "Nach dem Laden gesperrt starten",
+  lock_return_path: "Nach dem Entsperren zu dieser Ansicht springen (z. B. /lovelace/0)",
+  lock_emergency_hold: "Notfall-Entsperren: so lange gedrückt halten (0 = aus)",
   occasions: "Anlässe anzeigen (Ostern, Weihnachten, Neujahr, Geburtstage …)",
   occasion_easter: "Ostern",
   occasion_christmas: "Weihnachten",
@@ -2309,6 +2321,7 @@ const LABELS = {
   language: "Sprache",
   fit_screen: "An Bildschirmhöhe anpassen",
   tap_action: "Beim Antippen",
+  navigation_path: "Ansicht für „Zu einer Ansicht wechseln“ (z. B. /lovelace/0)",
   double_tap_action: "Beim Doppeltippen",
   info_entities: "Werte in der Info-Anzeige (z. B. Temperatur)",
   info_duration: "Info-Anzeige wie lange",
@@ -2510,7 +2523,9 @@ function lockSection(data) {
       { name: "lock_code", selector: { text: { type: "password" } } },
       { name: "lock_timeout", selector: { number: { min: 0, max: 60, step: 1, mode: "slider", unit_of_measurement: "min" } } },
       { name: "lock_entity", selector: { entity: {} } },
-      { name: "lock_on_start", selector: { boolean: {} } }
+      { name: "lock_on_start", selector: { boolean: {} } },
+      { name: "lock_return_path", selector: { text: {} } },
+      { name: "lock_emergency_hold", selector: { number: { min: 0, max: 60, step: 1, mode: "slider", unit_of_measurement: "s" } } }
     );
   }
   return {
@@ -2768,8 +2783,9 @@ const SCHEMA = [
           select: {
             mode: "dropdown",
             options: [
-              { value: "fullscreen", label: "Vollbild ein/aus" },
               { value: "info", label: "Datum & Werte zeigen" },
+              { value: "fullscreen", label: "Vollbild ein/aus" },
+              { value: "navigate", label: "Zu einer Ansicht wechseln" },
               { value: "none", label: "Nichts" },
             ],
           },
@@ -2783,11 +2799,13 @@ const SCHEMA = [
             options: [
               { value: "info", label: "Datum & Werte zeigen" },
               { value: "fullscreen", label: "Vollbild ein/aus" },
+              { value: "navigate", label: "Zu einer Ansicht wechseln" },
               { value: "none", label: "Nichts" },
             ],
           },
         },
       },
+      { name: "navigation_path", selector: { text: {} } },
       { name: "info_entities", selector: { entity: { multiple: true } } },
       { name: "info_duration", selector: { number: { min: 3, max: 60, step: 1, mode: "slider", unit_of_measurement: "s" } } },
       { name: "fullscreen_background", selector: { color_rgb: {} } },
@@ -2850,6 +2868,14 @@ const SCHEMA = [
     ],
   },
 ];
+
+/** In Home Assistant zu einer Ansicht wechseln, z. B. "/lovelace/0" */
+function navigateTo(path) {
+  const p = String(path || "").trim();
+  if (!p.startsWith("/")) return;
+  history.pushState(null, "", p);
+  window.dispatchEvent(new CustomEvent("location-changed", { detail: { replace: false } }));
+}
 
 /** Browser-Vollbild beenden, falls aktiv */
 function exitBrowserFullscreen() {
@@ -2983,6 +3009,19 @@ class LockController {
         "position:absolute;left:0;right:0;bottom:4vh;text-align:center;font:600 3vh sans-serif;letter-spacing:1vh;color:rgba(255,255,255,0.55);pointer-events:none;transition:opacity .3s;opacity:0;";
       o.append(card, dots);
       o.addEventListener("clockinletters-letter", (ev) => this.letter(ev.detail.letter));
+      // Notfall-Entsperren: lange gedrückt halten (falls das Geheimwort nicht klappt)
+      const holdEnd = () => clearTimeout(this.holdTimer);
+      o.addEventListener("pointerdown", () => {
+        clearTimeout(this.holdTimer);
+        const secs = clamp(this.cfg && this.cfg.lock_emergency_hold, 0, 120, DEFAULTS.lock_emergency_hold);
+        if (secs > 0) {
+          this.holdTimer = setTimeout(() => {
+            this.unlock();
+            navigateTo(this.cfg && this.cfg.lock_return_path);
+          }, secs * 1000);
+        }
+      });
+      for (const ev of ["pointerup", "pointercancel", "pointerleave"]) o.addEventListener(ev, holdEnd);
       document.body.appendChild(o);
       this.overlay = o;
       this.card = card;
@@ -3028,6 +3067,7 @@ class LockController {
     if (this.input.length >= code.length) {
       if (this.input === code) {
         this.unlock();
+        navigateTo(this.cfg.lock_return_path);
         return;
       }
       this.input = "";
@@ -3062,4 +3102,4 @@ console.info(
   "color: #fff; background: #111;"
 );
 
-if (typeof module !== "undefined") module.exports = { normalizeCode, easterSunday, parseBirthdays, occasionFor, wallDate, OCCASION_TEXTS, GREETINGS, greetingFromState, greetingForMinute, parseColorCode, normalizeColorCode, colorCodeOf, RAL_CLASSIC, LAYOUTS, hsToRgb, isActive, wallClock, parseTime, inTimeWindow, GRID_EN, computeWords, wordsToText, toCss, toRgb, resolveFont, withTheme, THEMES };
+if (typeof module !== "undefined") module.exports = { navigateTo, normalizeCode, easterSunday, parseBirthdays, occasionFor, wallDate, OCCASION_TEXTS, GREETINGS, greetingFromState, greetingForMinute, parseColorCode, normalizeColorCode, colorCodeOf, RAL_CLASSIC, LAYOUTS, hsToRgb, isActive, wallClock, parseTime, inTimeWindow, GRID_EN, computeWords, wordsToText, toCss, toRgb, resolveFont, withTheme, THEMES };

@@ -68,7 +68,8 @@ wachsen mit.
 - **An Bildschirmhöhe anpassen** (`fit_screen`, Standard an): Die Uhr wird nie
   höher als der sichtbare Bildschirm und bleibt auf breiten Monitoren quadratisch
   und zentriert.
-- **Vollbild** (unter „Bildschirm & Vollbild“ auf Antippen oder Doppeltippen legen):
+- **Vollbild** füllt jeden Bildschirm – 4:3, 16:9 oder hochkant – und lässt sich unter
+  „Bildschirm & Vollbild“ auf Antippen oder Doppeltippen legen:
   erneut antippen, `Esc`, der Knopf **„✕ Vollbild beenden“** oben rechts oder
   **1,5 Sekunden gedrückt halten** beendet es. Im Vollbild wird die Uhr so groß wie möglich dargestellt, der
   Mauszeiger ausgeblendet und der Bildschirm wach gehalten (sofern der Browser
@@ -132,6 +133,8 @@ Seite. Im Vollbild füllt eine frei eingestellte Uhr den ganzen Bildschirm.
 - **Antippen** zeigt für ein paar Sekunden Wochentag, Datum und frei wählbare Werte
   im Stil der Uhr (`tap_action: info`)
 - Vollbild lässt sich auf Antippen oder Doppeltippen legen (`fullscreen`)
+- **Zurück ins Dashboard:** `tap_action: navigate` mit `navigation_path: /lovelace/0` wechselt
+  beim Antippen in die angegebene Ansicht – praktisch, wenn die Uhr als Startbildschirm läuft
 
 ```yaml
 type: custom:clockinletters-card
@@ -248,6 +251,10 @@ lock_entity: input_boolean.besuch   # optional: nur sperren, solange Besuch da i
 Mit `lock_entity` wird nur gesperrt, solange die Entität an ist – schaltet eine Automation
 den „Besuchermodus“ ein, sperrt die Uhr sofort; aus = wieder frei.
 
+Nach dem Entsperren springt die Uhr auf Wunsch direkt in eine Ansicht
+(`lock_return_path: /lovelace/0`). Klappt das Geheimwort einmal nicht: **10 Sekunden
+gedrückt halten** entsperrt immer (`lock_emergency_hold`, `0` = aus).
+
 **Wichtig:**
 - Das ist ein **Sichtschutz, kein Zugriffsschutz**. Das Geheimwort steht im Dashboard-YAML,
   und wer sich auskennt, kommt über einen anderen Browser oder die Adresszeile trotzdem
@@ -318,8 +325,9 @@ wall_mount: true
 | `stencil`       | `true`            | Stege in O, Ö, Q, D wie bei ausgefrästen Buchstaben |
 | `language`      | `de`              | Sprache des Buchstabenrasters: `de`, `en`, `nl`, `fr`, `es` |
 | `fit_screen`    | `true`            | Uhr nie höher als der Bildschirm (quadratisch, zentriert) |
-| `tap_action`    | `info`            | Beim Antippen: `info`, `fullscreen` oder `none` |
-| `double_tap_action` | `none`        | Beim Doppeltippen: `info`, `fullscreen` oder `none` |
+| `tap_action`    | `info`            | Beim Antippen: `info`, `fullscreen`, `navigate` oder `none` |
+| `double_tap_action` | `none`        | Beim Doppeltippen: `info`, `fullscreen`, `navigate` oder `none` |
+| `navigation_path` | –               | Ziel für `navigate`, z. B. `/lovelace/0` |
 | `info_entities` | –                 | Werte für die Info-Anzeige, z. B. Temperatur |
 | `info_duration` | `8`               | Sekunden, bis wieder die Uhr erscheint |
 | `fullscreen_background` | `[0, 0, 0]` | Hintergrund im Vollbild |
@@ -358,6 +366,8 @@ wall_mount: true
 | `lock_timeout`  | `5`               | Minuten ohne Berührung bis zur Sperre (`0` = nie automatisch) |
 | `lock_entity`   | –                 | Nur sperren, solange diese Entität an ist (Besuchermodus) |
 | `lock_on_start` | `true`            | Nach dem Laden der Seite gesperrt starten |
+| `lock_return_path` | –              | Nach dem Entsperren zu dieser Ansicht springen, z. B. `/lovelace/0` |
+| `lock_emergency_hold` | `10`        | Sekunden gedrückt halten zum Notfall-Entsperren (`0` = aus) |
 | `panel_fill`    | `auto`            | Bildschirm füllen: `auto` (in Panel-Ansicht), `always` (immer), `off` (quadratisch) |
 | `custom_size`   | `false`           | Breite und Höhe frei einstellen |
 | `width` / `width_unit` | `100` / `%` | Breite in `%` (der Karte) oder `px` |

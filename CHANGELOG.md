@@ -2,6 +2,13 @@
 
 Alle Versionen der Karte „Clock in Letters“. Die neueste steht oben.
 
+## [1.16.0] – 2026-11-12
+
+- Vollbild füllt jetzt jeden Bildschirm automatisch (4:3, 16:9, hochkant) statt quadratisch
+- Neue Aktion „Zu einer Ansicht wechseln“ für Antippen/Doppeltippen (`navigation_path`)
+- Sichtschutz: nach dem Entsperren direkt in eine Ansicht springen (`lock_return_path`)
+- Sichtschutz: Notfall-Entsperren durch 10 Sekunden Gedrückthalten (einstellbar, 0 = aus)
+
 ## [1.15.2] – 2026-10-04
 
 - Behoben: Vollbild ließ sich in Home Assistant nicht beenden („gefangen in der Uhr“).
